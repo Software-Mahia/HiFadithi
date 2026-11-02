@@ -1,0 +1,11 @@
+name: Nightly backup
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 03:00 Nairobi time
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "TODO (B): install postgresql-client and age, run scripts/backup.sh, upload the file"
