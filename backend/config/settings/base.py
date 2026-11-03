@@ -126,6 +126,11 @@ Q_CLUSTER = {
 
 # Meshy (owner: C)
 ENGINE = env("ENGINE", default="fake")
+FAKE_ENGINE_GLB_URL = env(
+    "FAKE_ENGINE_GLB_URL",
+    default="https://gsefmwehmvvugcfgakbj.supabase.co/storage/v1/object/public/samples/demo-model.glb",
+)
+FAKE_ENGINE_SECONDS = env.int("FAKE_ENGINE_SECONDS", default=5)
 MESHY_API_KEY = env("MESHY_API_KEY", default="")
 MESHY_WEBHOOK_TOKEN = env("MESHY_WEBHOOK_TOKEN", default="")
 MESHY_MONTHLY_CREDIT_LIMIT = env.int("MESHY_MONTHLY_CREDIT_LIMIT", default=300)
