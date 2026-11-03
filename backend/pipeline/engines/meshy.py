@@ -9,6 +9,10 @@ Error handling (blueprint section 9):
 - Meshy slow or down (no connection, 5xx): retry up to 3 attempts, then "Meshy unavailable".
 - 429 (rate limit): wait for the Retry-After header, then retry.
 - Other 4xx (for example a bad image): fail at once with Meshy's own message.
+
+Starting a task (POST) is only retried when we know Meshy never received it: the connection
+failed before sending, or Meshy answered 429. A timeout or 5xx after sending might mean the
+task was created anyway, and retrying could start (and pay for) a second one.
 """
 import time
 
@@ -19,6 +23,10 @@ from .base import Engine, TaskStatus
 
 BASE_URL = "https://api.meshy.ai/openapi/v1/multi-image-to-3d"
 MAX_RETRY_AFTER_SECONDS = 30
+MAX_ERROR_TEXT = 300
+KNOWN_STATUSES = {"PENDING", "IN_PROGRESS", "SUCCEEDED", "FAILED", "CANCELED"}
+# Errors where the request never left our side, so a retry can't create a duplicate task.
+NOT_SENT_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 
 
 class MeshyError(Exception):
@@ -59,11 +67,18 @@ class MeshyEngine(Engine):
             "target_polycount": 30000,
         }
         data = self._request("POST", BASE_URL, json=body)
-        return data["result"]
+        task_id = data.get("result")
+        if not task_id:
+            reply = str(data)[:MAX_ERROR_TEXT]
+            raise MeshyError(f"Meshy sent an unexpected reply with no task id: {reply}")
+        return task_id
 
     def get_status(self, task_id: str) -> TaskStatus:
         data = self._request("GET", f"{BASE_URL}/{task_id}")
-        status = data.get("status", "PENDING")
+        status = data.get("status")
+        if status not in KNOWN_STATUSES:
+            # Never guess PENDING: the job would wait forever instead of failing.
+            raise MeshyError(f"Meshy sent an unexpected task status: {status!r}")
         error = (data.get("task_error") or {}).get("message") or None
         return TaskStatus(
             status=status,
@@ -74,7 +89,11 @@ class MeshyEngine(Engine):
         )
 
     def delete(self, task_id: str) -> None:
-        """Delete the task and its files at Meshy. An already-expired task counts as deleted."""
+        """Delete the task and its files at Meshy. An already-expired task counts as deleted.
+
+        Meshy refuses to delete a task that is still running (HTTP 409). That raises MeshyError
+        with status_code 409: callers cleaning up should wait until the task has finished.
+        """
         try:
             self._request("DELETE", f"{BASE_URL}/{task_id}")
         except MeshyError as exc:
@@ -84,13 +103,23 @@ class MeshyEngine(Engine):
 
     def _request(self, method: str, url: str, **kwargs) -> dict:
         headers = {"Authorization": f"Bearer {self.api_key}"}
+        is_post = method.upper() == "POST"
         last_error: MeshyError | None = None
         for attempt in range(1, self.max_attempts + 1):
             wait = 2**attempt  # 2 s, then 4 s
             try:
                 response = self.client.request(method, url, headers=headers, **kwargs)
-            except httpx.TransportError:
+            except NOT_SENT_ERRORS:
                 last_error = MeshyError("Meshy unavailable: could not connect.", retryable=True)
+            except httpx.TransportError as exc:
+                if is_post:
+                    raise MeshyError(
+                        "Meshy did not reply after the task was sent, so it may have started. "
+                        "Not retrying, to avoid paying for a second task.",
+                    ) from exc
+                last_error = MeshyError(
+                    f"Meshy unavailable: no reply ({type(exc).__name__}).", retryable=True
+                )
             else:
                 code = response.status_code
                 if code == 429:
@@ -99,6 +128,12 @@ class MeshyEngine(Engine):
                     )
                     wait = _retry_after_seconds(response, default=wait)
                 elif code >= 500:
+                    if is_post:
+                        raise MeshyError(
+                            f"Meshy had an error (HTTP {code}) after the task was sent, so it may "
+                            "have started. Not retrying, to avoid paying for a second task.",
+                            status_code=code,
+                        )
                     last_error = MeshyError(
                         f"Meshy unavailable (HTTP {code}).", status_code=code, retryable=True
                     )
@@ -123,4 +158,7 @@ def _meshy_message(response: httpx.Response) -> str:
         message = response.json().get("message")
     except ValueError:
         message = None
-    return f"Meshy refused the request (HTTP {response.status_code}): {message or response.text}"
+    detail = (message or response.text or "").strip()
+    if len(detail) > MAX_ERROR_TEXT:
+        detail = detail[:MAX_ERROR_TEXT] + "..."
+    return f"Meshy refused the request (HTTP {response.status_code}): {detail}"
