@@ -1,0 +1,48 @@
+# Render Blueprint for HiFadithi. Owner: C.
+# Render reads this when you choose New > Blueprint and pick this repository.
+# Values marked `sync: false` are secrets: Render asks for them once, in its dashboard.
+services:
+  - type: web
+    name: hifadithi-api
+    runtime: python
+    plan: free
+    region: frankfurt          # close to our Supabase project in Europe
+    branch: prod               # deploys only what is merged into prod
+    rootDir: backend
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    healthCheckPath: /healthz/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      # Generate once with: python -c "import secrets; print(secrets.token_urlsafe(60))"
+      - key: SECRET_KEY
+        sync: false
+      # Supabase session pooler string, ending in ?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      # Supabase Storage (S3 API)
+      - key: USE_SUPABASE_STORAGE
+        value: "True"
+      - key: SUPABASE_S3_ENDPOINT
+        sync: false
+      - key: SUPABASE_S3_REGION
+        sync: false
+      - key: SUPABASE_S3_ACCESS_KEY_ID
+        sync: false
+      - key: SUPABASE_S3_SECRET_ACCESS_KEY
+        sync: false
+      # Meshy: stays on the fake engine until the first real job (Friday)
+      - key: ENGINE
+        value: fake
+      - key: MESHY_API_KEY
+        sync: false
+      - key: MESHY_AI_MODEL
+        value: meshy-6-lite
+      - key: MESHY_WEBHOOK_TOKEN
+        generateValue: true
+      - key: MESHY_MONTHLY_CREDIT_LIMIT
+        value: "300"
