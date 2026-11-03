@@ -103,8 +103,12 @@ BEGIN
         RETURN NEW;
     END IF;
     FOREACH col IN ARRAY TG_ARGV LOOP
+        -- NOTE: the percent signs in the RAISE format below are doubled because
+        -- psycopg 3 treats a single one as a client-side parameter placeholder;
+        -- Django collapses the pair back to one before the SQL reaches Postgres,
+        -- so the stored function keeps the usual PL/pgSQL format.
         IF (to_jsonb(NEW) -> col) IS DISTINCT FROM (to_jsonb(OLD) -> col) THEN
-            RAISE EXCEPTION '%.% can only change through transition_model()', TG_TABLE_NAME, col
+            RAISE EXCEPTION '%%.%% can only change through transition_model()', TG_TABLE_NAME, col
                 USING ERRCODE = 'insufficient_privilege';
         END IF;
     END LOOP;
