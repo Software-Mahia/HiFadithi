@@ -82,12 +82,18 @@ USE_TZ = True  # stored in UTC, shown in Nairobi time
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# File storage: Supabase Storage through its S3-compatible API (owner: B).
+# File storage. Uploaded files: local folder by default, Supabase Storage when switched on.
+# Static files (admin CSS/JS): Django's default here; WhiteNoise in production.py.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# Supabase Storage through its S3-compatible API (owner: B).
 if env.bool("USE_SUPABASE_STORAGE", default=False):
-    STORAGES = {
-        "default": {"BACKEND": "storages.backends.s3.S3Storage"},
-        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-    }
+    STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage"}
     AWS_S3_ENDPOINT_URL = env("SUPABASE_S3_ENDPOINT")
     AWS_S3_REGION_NAME = env("SUPABASE_S3_REGION")
     AWS_ACCESS_KEY_ID = env("SUPABASE_S3_ACCESS_KEY_ID")
@@ -95,9 +101,6 @@ if env.bool("USE_SUPABASE_STORAGE", default=False):
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = True
     AWS_QUERYSTRING_EXPIRE = 3600
-else:
-    MEDIA_URL = "media/"
-    MEDIA_ROOT = BASE_DIR / "media"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -123,6 +126,11 @@ Q_CLUSTER = {
 
 # Meshy (owner: C)
 ENGINE = env("ENGINE", default="fake")
+FAKE_ENGINE_GLB_URL = env(
+    "FAKE_ENGINE_GLB_URL",
+    default="https://gsefmwehmvvugcfgakbj.supabase.co/storage/v1/object/public/samples/demo-model.glb",
+)
+FAKE_ENGINE_SECONDS = env.int("FAKE_ENGINE_SECONDS", default=5)
 MESHY_API_KEY = env("MESHY_API_KEY", default="")
 MESHY_AI_MODEL = env("MESHY_AI_MODEL", default="meshy-6-lite")  # meshy-7.1 for the pilot
 MESHY_WEBHOOK_TOKEN = env("MESHY_WEBHOOK_TOKEN", default="")
