@@ -124,5 +124,6 @@ Q_CLUSTER = {
 # Meshy (owner: C)
 ENGINE = env("ENGINE", default="fake")
 MESHY_API_KEY = env("MESHY_API_KEY", default="")
+MESHY_AI_MODEL = env("MESHY_AI_MODEL", default="meshy-6-lite")  # meshy-7.1 for the pilot
 MESHY_WEBHOOK_TOKEN = env("MESHY_WEBHOOK_TOKEN", default="")
 MESHY_MONTHLY_CREDIT_LIMIT = env.int("MESHY_MONTHLY_CREDIT_LIMIT", default=300)
