@@ -23,6 +23,12 @@ Priority order. What blocks A, and what someone else (or the owner, Joylynn) mus
 7. **B: `core.storage` delete helper** (`delete_object(bucket, path)`) — required before
    `remove_capture_photos` can delete capture files. C's engine `delete` already exists.
 
+## CI
+9. The new **gitleaks** secret-scan job in `.github/workflows/ci.yml` was not run locally
+   (gitleaks is not installed on this machine). It should pass — all `.env.example` values are
+   empty or low-entropy placeholders — but confirm on the first CI run; add a `.gitleaks.toml`
+   allowlist for `.env.example`/docs if it reports false positives.
+
 ## Docs
 8. `docs/blueprint.md` and `docs/django-addendum.md` referenced by the brief do not exist. The
    blueprint is at `.tools/scan/HiFadithi_Build_Blueprint_and_Work_Split (3).md`; the Django

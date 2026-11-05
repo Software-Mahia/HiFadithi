@@ -1,0 +1,24 @@
+# Local Postgres for development. Matches B's backup scripts (container hifadithi-db,
+# db hifadithi, user postgres on the trusted local socket). Not for production.
+#   docker compose up -d db
+#   DATABASE_URL=postgres://postgres@localhost:5432/hifadithi  (in backend/.env)
+services:
+  db:
+    image: postgres:16
+    container_name: hifadithi-db
+    environment:
+      POSTGRES_DB: hifadithi
+      POSTGRES_USER: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - hifadithi_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hifadithi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hifadithi_pgdata:
