@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Back up the LOCAL Docker Postgres (container hifadithi-pg, db hifadithi).
+# Back up the LOCAL Docker Postgres (container hifadithi-db, db hifadithi).
 # Uses the container's trusted local socket: no password needed.
 # Output: backups/hifadithi_<UTC timestamp>.dump (pg_dump custom format).
 set -euo pipefail
 
-CONTAINER="hifadithi-pg"
+CONTAINER="hifadithi-db"
 PGUSER="postgres"
 DB="hifadithi"
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Restore drill for the LOCAL Docker Postgres (container hifadithi-pg).
+# Restore drill for the LOCAL Docker Postgres (container hifadithi-db).
 # Restores a backup into a throwaway database (hifadithi_restore_drill),
 # compares exact row counts with the live db, then drops it. The live "hifadithi" db is only read, never modified.
 # Usage: scripts/restore_drill.sh [path/to/backup.dump]   (default: newest in backups/)
 set -euo pipefail
 
-CONTAINER="hifadithi-pg"
+CONTAINER="hifadithi-db"
 PGUSER="postgres"
 SCRATCH_DB="hifadithi_restore_drill"
 LIVE_DB="hifadithi"   # read-only SELECTs only (table list + count(*)); never DROP/CREATE/restore
