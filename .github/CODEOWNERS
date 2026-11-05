@@ -1,23 +1,26 @@
-# Code owners by slice. A reviews B, B reviews C, C reviews D, D reviews A;
-# any change inside another slice's path also needs that slice owner's approval.
+# Code owners = whose approval a change in that path needs.
+# Review pairs: A reviews B, B reviews C, C reviews D, D reviews A.
+# Each path lists the slice owner AND its reviewer, so a normal same-slice PR
+# clears via the reviewer (the author cannot self-approve), and a cross-slice
+# edit still needs the path owner's approval.
 # A=@JoylynnWanjiru  B=@codingwithgitau  C=@TamiraAtieno1  D=@B1t-Master
 
-# A: foundations, access, CI
-/.github/                       @JoylynnWanjiru
-/backend/config/                @JoylynnWanjiru
-/backend/core/                  @JoylynnWanjiru
-/backend/accounts/              @JoylynnWanjiru
-/backend/access/                @JoylynnWanjiru
+# A: foundations, access, CI  (reviewer: D)
+/.github/                       @JoylynnWanjiru @B1t-Master
+/backend/config/                @JoylynnWanjiru @B1t-Master
+/backend/core/                  @JoylynnWanjiru @B1t-Master
+/backend/accounts/              @JoylynnWanjiru @B1t-Master
+/backend/access/                @JoylynnWanjiru @B1t-Master
 
-# B: records, storage, backups
-/backend/core/storage.py        @codingwithgitau
-/backend/artefacts/             @codingwithgitau
-/scripts/                       @codingwithgitau
+# B: records, storage, backups  (reviewer: A)
+/backend/core/storage.py        @codingwithgitau @JoylynnWanjiru
+/backend/artefacts/             @codingwithgitau @JoylynnWanjiru
+/scripts/                       @codingwithgitau @JoylynnWanjiru
 
-# C: pipeline
-/backend/pipeline/              @TamiraAtieno1
+# C: pipeline  (reviewer: B)
+/backend/pipeline/              @TamiraAtieno1 @codingwithgitau
 
-# D: lifecycle, audit, narration
-/backend/workflow/              @B1t-Master
-/backend/audit/                 @B1t-Master
-/backend/narration/             @B1t-Master
+# D: lifecycle, audit, narration  (reviewer: C)
+/backend/workflow/              @B1t-Master @TamiraAtieno1
+/backend/audit/                 @B1t-Master @TamiraAtieno1
+/backend/narration/             @B1t-Master @TamiraAtieno1
