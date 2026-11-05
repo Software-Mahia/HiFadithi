@@ -20,6 +20,12 @@ class BadRole(APIException):
     default_detail = "Unknown role."
 
 
+class CannotChangeOwnRole(APIException):
+    status_code = status.HTTP_403_FORBIDDEN
+    default_code = "cannot_change_own_role"
+    default_detail = "You cannot change your own role."
+
+
 def _split_name(full_name):
     full_name = (full_name or "").strip()
     if not full_name:
@@ -50,6 +56,21 @@ def invite_staff(*, email, full_name, role, invited_by=None):
     )
     user.set_unusable_password()
     user.save()
+    return user
+
+
+def change_role(*, user, role, actor):
+    """Change a staff member's role (admin only; enforced in the view).
+
+    Refuses an admin changing their OWN role (prevents self-lockout and satisfies
+    "nobody can change their own role"). Raises BadRole (422) for an unknown role.
+    """
+    if role not in User.Role.values:
+        raise BadRole()
+    if actor is not None and actor.pk == user.pk:
+        raise CannotChangeOwnRole()
+    user.role = role
+    user.save(update_fields=["role"])
     return user
 
 
