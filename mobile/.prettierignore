@@ -1,0 +1,13 @@
+node_modules
+.expo
+.npm-cache
+.phase0-template
+assets
+dist
+supabase/config.toml
+docs/blueprint.md
+HiFadithi_Build_Blueprint_and_Work_Split (3).md
+AGENTS.md
+package-lock.json
+.tools
+.venv

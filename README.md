@@ -3,7 +3,8 @@
 NMK's internal tool for verified 3D records of artefacts.
 
 - `backend/`: Django + Django REST Framework. Supabase is used only as the Postgres database and file storage.
-- `mobile/`: Expo app (front-end phase).
+- `mobile/`: Expo app shell and preserved local authentication screens. See
+  [mobile setup and integration status](mobile/README.md) before running it.
 
 ## Run the back end locally
 
