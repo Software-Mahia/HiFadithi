@@ -42,6 +42,7 @@ def test_job_page_shows_the_model_viewer(admin_client, job):
     page = admin_client.get(reverse("admin:pipeline_job_change", args=[job.pk]))
 
     assert b"<model-viewer" in page.content
+    assert b'integrity="sha384-' in page.content
     assert version.glb_path.encode() in page.content
     assert b"200 mm wide x 100 mm deep, 12 triangles" in page.content
 

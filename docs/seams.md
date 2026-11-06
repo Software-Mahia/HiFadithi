@@ -21,7 +21,7 @@ Agree these on day 1. Change one only after telling the people who use it.
 | Narrator deletion | A | D (consent withdrawal) | `access.services.delete_person_data(consent, actor)` | Day 5 |
 | Audit | D | everyone | `audit.services.log_audit(actor, action, obj)` | Day 5 |
 | Engine | C | A (after day 6) | `pipeline.engines.get_engine().delete(task_id)` | Day 2 (interface) |
-| Deployed URL | C | everyone | `https://<host>/` with the Meshy webhook at `/api/webhooks/meshy/<token>/` | Day 4 |
+| Deployed URL | C | everyone | `https://hifadithi-api.onrender.com/` (deploys from `prod`). Meshy webhook `/api/webhooks/meshy/<token>/`, cron poll `/api/jobs/poll/<token>/` (token = `MESHY_WEBHOOK_TOKEN` in Render) | Done |
 
 ## Known limits (B)
 

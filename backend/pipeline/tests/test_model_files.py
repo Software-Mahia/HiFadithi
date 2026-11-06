@@ -97,3 +97,42 @@ def test_fill_model_version_records_path_and_sizes_but_not_scale_or_status(stora
     assert version.size_bytes == len(GLB)
     assert "scale_factor" not in version.saved_fields
     assert "review_status" not in version.saved_fields
+
+
+def redirecting_client(locations, final=None):
+    """Answers with a redirect to each location in turn, then `final` (default: the GLB)."""
+    hops = iter(locations)
+
+    def handler(request):
+        nxt = next(hops, None)
+        if nxt is None:
+            return final or httpx.Response(200, content=GLB)
+        return httpx.Response(302, headers={"Location": nxt})
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def only_meshy(url):
+    return url.startswith("https://assets.meshy.ai/")
+
+
+def test_a_redirect_inside_the_allowed_host_is_followed(storage):
+    client = redirecting_client(["https://assets.meshy.ai/real/model.glb"])
+    stored = copy_model("https://assets.meshy.ai/x.glb", "a1/v1/model.glb",
+                        allowed=only_meshy, client=client, storage=storage)
+    assert stored.info.triangles == 12
+
+
+def test_a_redirect_to_another_host_is_refused(storage):
+    client = redirecting_client(["https://evil.example.org/model.glb"])
+    with pytest.raises(ModelCopyError, match="outside the 3D service"):
+        copy_model("https://assets.meshy.ai/x.glb", "a1/v1/model.glb",
+                   allowed=only_meshy, client=client, storage=storage)
+    assert not storage.exists("a1/v1/model.glb")
+
+
+def test_too_many_redirects_are_refused(storage):
+    client = redirecting_client(["https://assets.meshy.ai/r"] * 10)
+    with pytest.raises(ModelCopyError, match="too many times"):
+        copy_model("https://assets.meshy.ai/x.glb", "a1/v1/model.glb",
+                   allowed=only_meshy, client=client, storage=storage)
