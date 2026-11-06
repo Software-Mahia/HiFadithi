@@ -1,0 +1,87 @@
+### Slice B: artefacts and captures. VS Code extension "REST Client" (humao.rest-client).
+### Send the requests top to bottom. Nothing secret is stored in this file.
+### Local server: http://localhost:8000. Deployed: put the Render URL below.
+
+@baseUrl = https://YOUR-HOST
+
+### 0. Sign in (owned by A; included so the later requests have a token).
+### Login takes "username". If this returns 400, try "email" instead.
+# @name login
+# @prompt username Your username
+# @prompt password Your password
+POST {{baseUrl}}/api/auth/token/
+Content-Type: application/json
+
+{ "username": "{{username}}", "password": "{{password}}" }
+
+###
+@token = {{login.response.body.$.access}}
+
+### 1. Create an artefact (researcher). 201 and the new record, starting as Draft.
+### nmk_accession_no must be unique: use a new value on every run.
+# @name createArtefact
+POST {{baseUrl}}/api/artefacts/
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nmk_accession_no": "DEMO-E2E-001",
+  "title": "DEMO: e2e test object",
+  "community": "Demo community",
+  "object_type": "Vessel",
+  "materials": "Clay (demo)",
+  "height_mm": "240.0",
+  "width_mm": "180.0",
+  "depth_mm": "180.0"
+}
+
+###
+@artefactId = {{createArtefact.response.body.$.id}}
+
+### 2. Fetch one artefact. 404 if it does not exist or is not visible to you.
+GET {{baseUrl}}/api/artefacts/{{artefactId}}/
+Authorization: Bearer {{token}}
+
+### 3. Start a capture. 201 with id, expires_in and four signed upload links.
+# @name startCapture
+POST {{baseUrl}}/api/artefacts/{{artefactId}}/captures/
+Authorization: Bearer {{token}}
+
+### 4. Upload the four photos straight to storage with the signed links.
+### Do NOT add an Authorization header: the link carries its own signature and storage
+### rejects a request that has two. Content-Type must be exactly image/jpeg. Success is 200.
+### Put four harmless JPEGs (never NMK photos) in ./sample-photos/ as front, back, left, right.
+PUT {{startCapture.response.body.$.upload_urls.front}}
+Content-Type: image/jpeg
+
+< ./sample-photos/front.jpg
+
+###
+PUT {{startCapture.response.body.$.upload_urls.back}}
+Content-Type: image/jpeg
+
+< ./sample-photos/back.jpg
+
+###
+PUT {{startCapture.response.body.$.upload_urls.left}}
+Content-Type: image/jpeg
+
+< ./sample-photos/left.jpg
+
+###
+PUT {{startCapture.response.body.$.upload_urls.right}}
+Content-Type: image/jpeg
+
+< ./sample-photos/right.jpg
+
+### 5. Complete the capture. Checks all four photos exist, then returns upload_complete true and views.
+POST {{baseUrl}}/api/artefacts/captures/{{startCapture.response.body.$.id}}/complete/
+Authorization: Bearer {{token}}
+
+### 6. Search (step 8 of the e2e script). Returns { count, next, previous, results }.
+GET {{baseUrl}}/api/artefacts/?q=e2e&limit=20&offset=0
+Authorization: Bearer {{token}}
+
+### 6b. Filters: community and object_type (case-insensitive exact), status (draft, in_collection, withdrawn).
+GET {{baseUrl}}/api/artefacts/?community=Demo%20community&status=draft
+Authorization: Bearer {{token}}
