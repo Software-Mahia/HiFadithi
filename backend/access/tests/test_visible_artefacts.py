@@ -53,6 +53,17 @@ def test_a_grant_for_another_user_does_not_leak():
     assert list(visible_artefacts(other)) == []
 
 
+def test_empty_role_does_not_leak_user_grants():
+    # A user grant stores role="". A user whose own role is "" must not match those rows.
+    art = make_artefact("NMK-SECRET", restricted=True)
+    owner = make_user("owner")
+    ArtefactAccess.objects.create(artefact=art, user=owner)
+    stranger = make_user("stranger")
+    stranger.role = ""
+    stranger.save(update_fields=["role"])
+    assert list(visible_artefacts(stranger)) == []
+
+
 def test_admin_is_not_exempt_from_restriction():
     make_artefact("NMK-SECRET", restricted=True)
     admin = make_user("admin", role=User.Role.ADMIN)

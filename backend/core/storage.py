@@ -4,6 +4,7 @@ Buckets are created once in the Supabase dashboard. Use these names everywhere.
 """
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
@@ -69,3 +70,15 @@ def signed_upload_url(
     if content_type:
         params["ContentType"] = content_type
     return _client().generate_presigned_url("put_object", Params=params, ExpiresIn=expires_in)
+
+
+def object_exists(bucket: str, path: str) -> bool:
+    """True if the file is in storage. Used to check that all photos were uploaded."""
+    _check(bucket, path)
+    try:
+        _client().head_object(Bucket=bucket, Key=path)
+    except ClientError as exc:
+        if exc.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+    return True

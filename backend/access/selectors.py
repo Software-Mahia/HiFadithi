@@ -17,8 +17,12 @@ def visible_artefacts(user):
     if not (user and getattr(user, "is_authenticated", False) and user.is_active):
         return Artefact.objects.none()
 
-    grant = ArtefactAccess.objects.filter(
-        Q(user=user) | Q(role=user.role),
-        artefact_id=OuterRef("pk"),
-    )
+    # Match a role grant only when the user has a role. An empty role ("") must never match
+    # the role-grant rows: user grants also store role="", so Q(role="") would leak every
+    # artefact granted to anyone. User.role is never "" in practice (default + choices), but
+    # nothing at the DB level forbids it, so guard here.
+    grant_filter = Q(user=user)
+    if user.role:
+        grant_filter |= Q(role=user.role)
+    grant = ArtefactAccess.objects.filter(grant_filter, artefact_id=OuterRef("pk"))
     return Artefact.objects.filter(Q(restricted=False) | Exists(grant))
