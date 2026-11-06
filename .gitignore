@@ -9,3 +9,5 @@ media/
 .ruff_cache/
 node_modules/
 backups/
+
+docs/api/b-artefacts/sample-photos/
