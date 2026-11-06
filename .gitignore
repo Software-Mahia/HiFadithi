@@ -9,3 +9,6 @@ media/
 .ruff_cache/
 node_modules/
 backups/
+
+# local dev database
+*.sqlite3
