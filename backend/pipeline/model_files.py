@@ -7,6 +7,7 @@ into the private `models` bucket straight away and stores only our own path.
 
 With USE_SUPABASE_STORAGE off, files go to MEDIA_ROOT/models/ on your laptop instead.
 """
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -20,6 +21,8 @@ from .glb import GlbError, GlbInfo, read_glb_info
 
 MAX_GLB_BYTES = 100 * 1024 * 1024  # a 30k-triangle textured model is usually 5-20 MB
 DOWNLOAD_TIMEOUT = httpx.Timeout(15.0, connect=5.0)  # Meshy wants a webhook reply within ~25 s
+MAX_REDIRECTS = 3
+REDIRECT_CODES = {301, 302, 303, 307, 308}
 
 
 class ModelCopyError(Exception):
@@ -45,9 +48,16 @@ def models_storage():
     return FileSystemStorage(location=settings.MEDIA_ROOT / MODELS_BUCKET)
 
 
-def copy_model(glb_url: str, path: str, *, client: httpx.Client | None = None, storage=None):
+def copy_model(
+    glb_url: str,
+    path: str,
+    *,
+    allowed: Callable[[str], bool] | None = None,
+    client: httpx.Client | None = None,
+    storage=None,
+):
     """Download the GLB, check it is a readable model, save it at `path`. Returns StoredModel."""
-    data = _download(glb_url, client or httpx.Client(timeout=DOWNLOAD_TIMEOUT))
+    data = _download(glb_url, client or httpx.Client(timeout=DOWNLOAD_TIMEOUT), allowed)
     try:
         info = read_glb_info(data)
     except GlbError as exc:
@@ -76,20 +86,32 @@ def fill_model_version(model_version, stored: StoredModel) -> None:
     )
 
 
-def _download(url: str, client: httpx.Client) -> bytes:
+def _download(url: str, client: httpx.Client, allowed=None) -> bytes:
+    """Follow at most MAX_REDIRECTS redirects, checking every hop with `allowed`."""
     try:
-        with client.stream("GET", url, follow_redirects=True) as response:
-            if response.status_code != 200:
-                raise ModelCopyError(f"Could not download the model (HTTP {response.status_code}).")
-            declared = response.headers.get("Content-Length")
-            if declared and declared.isdigit() and int(declared) > MAX_GLB_BYTES:
-                raise ModelCopyError("The model file is larger than 100 MB.")
-            chunks, total = [], 0
-            for chunk in response.iter_bytes():
-                total += len(chunk)
-                if total > MAX_GLB_BYTES:
-                    raise ModelCopyError("The model file is larger than 100 MB.")
-                chunks.append(chunk)
+        for _ in range(MAX_REDIRECTS + 1):
+            if allowed is not None and not allowed(url):
+                raise ModelCopyError("The model link points outside the 3D service.")
+            with client.stream("GET", url, follow_redirects=False) as response:
+                if response.status_code in REDIRECT_CODES and "Location" in response.headers:
+                    url = str(response.url.join(response.headers["Location"]))
+                    continue
+                return _read_body(response)
+        raise ModelCopyError("The model link redirected too many times.")
     except httpx.HTTPError as exc:
         raise ModelCopyError(f"Could not download the model ({type(exc).__name__}).") from exc
+
+
+def _read_body(response) -> bytes:
+    if response.status_code != 200:
+        raise ModelCopyError(f"Could not download the model (HTTP {response.status_code}).")
+    declared = response.headers.get("Content-Length")
+    if declared and declared.isdigit() and int(declared) > MAX_GLB_BYTES:
+        raise ModelCopyError("The model file is larger than 100 MB.")
+    chunks, total = [], 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > MAX_GLB_BYTES:
+            raise ModelCopyError("The model file is larger than 100 MB.")
+        chunks.append(chunk)
     return b"".join(chunks)

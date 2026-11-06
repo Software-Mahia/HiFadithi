@@ -12,3 +12,9 @@ python manage.py setup_roles                # keep the researcher/curator/admin 
 if [ -n "${DJANGO_SUPERUSER_USERNAME:-}" ]; then
   python manage.py createsuperuser --no-input || echo "Admin account already exists, skipping."
 fi
+
+# Demo records DEMO-001..005 (create-only: never updates or deletes, so safe on every deploy).
+# On when SEED_DEMO=1 in Render. --force only lets it run with DEBUG off.
+if [ "${SEED_DEMO:-}" = "1" ]; then
+  python manage.py seed_demo --force || echo "seed_demo failed, see log above"
+fi

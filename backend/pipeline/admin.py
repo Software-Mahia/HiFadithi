@@ -14,6 +14,9 @@ from .models import Job
 
 # Google's <model-viewer> web component (npm @google/model-viewer), a fixed version.
 MODEL_VIEWER_JS = "https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"
+# Subresource Integrity: the browser refuses the script if the CDN ever serves different bytes.
+# sha384 of dist/model-viewer.min.js in the npm package @google/model-viewer@4.0.0.
+MODEL_VIEWER_SRI = "sha384-sr9b4Ux0WhAUGclJ0ym0FSY2zSOMmNSn0bP/SA0e6bNCrpn/5W3QL8mm+LdlQMKw"
 
 
 def model_url(glb_path):
@@ -48,12 +51,12 @@ class JobAdmin(admin.ModelAdmin):
         if not path:
             return "No model yet."
         return format_html(
-            '<script type="module" src="{}"></script>'
+            '<script type="module" src="{}" integrity="{}" crossorigin="anonymous"></script>'
             '<model-viewer src="{}" alt="AI-assisted 3D model of {}" camera-controls '
             'auto-rotate shadow-intensity="1" '
             'style="width:480px;height:400px;background:#F1EAE4;border-radius:12px">'
             "</model-viewer>",
-            MODEL_VIEWER_JS, model_url(path), job.model_version.artefact,
+            MODEL_VIEWER_JS, MODEL_VIEWER_SRI, model_url(path), job.model_version.artefact,
         )
 
     @admin.display(description="Model size (model units, not yet scaled)")
