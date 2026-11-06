@@ -28,7 +28,8 @@ class Artefact(models.Model):
     object_type = models.CharField(max_length=120, blank=True)
     materials = models.TextField(blank=True)
 
-    # Millimetres. Nullable: a Draft may not have them yet. C's start-job needs height_mm.
+    # Millimetres. Nullable: a Draft may not have them yet.
+    # C's start-job does not read them.
     height_mm = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     width_mm = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     depth_mm = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
