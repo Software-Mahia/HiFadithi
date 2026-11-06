@@ -13,6 +13,12 @@ class InviteSerializer(serializers.Serializer):
     role = serializers.CharField(max_length=20)
 
 
+class RoleChangeSerializer(serializers.Serializer):
+    """Input for role change. Role validated in the service (422 bad_role, not 400)."""
+
+    role = serializers.CharField(max_length=20)
+
+
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
 

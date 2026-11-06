@@ -1,6 +1,7 @@
 from urllib.parse import parse_qs, urlparse
 
 import pytest
+from botocore.exceptions import ClientError
 from django.core.exceptions import ImproperlyConfigured
 
 from core import storage
@@ -67,3 +68,28 @@ def test_missing_configuration_gives_a_clear_error(settings):
     settings.AWS_S3_ENDPOINT_URL = None
     with pytest.raises(ImproperlyConfigured, match="USE_SUPABASE_STORAGE"):
         storage.signed_download_url(storage.CAPTURES_BUCKET, PATH)
+
+class FakeClient:
+    def __init__(self, code=None):
+        self.code = code
+
+    def head_object(self, **kwargs):
+        if self.code:
+            raise ClientError({"Error": {"Code": self.code}}, "HeadObject")
+        return {}
+
+
+def test_object_exists_is_true_when_the_file_is_there(monkeypatch):
+    monkeypatch.setattr(storage, "_client", lambda: FakeClient())
+    assert storage.object_exists(storage.CAPTURES_BUCKET, PATH) is True
+
+
+def test_object_exists_is_false_when_the_file_is_missing(monkeypatch):
+    monkeypatch.setattr(storage, "_client", lambda: FakeClient("404"))
+    assert storage.object_exists(storage.CAPTURES_BUCKET, PATH) is False
+
+
+def test_object_exists_does_not_hide_other_errors(monkeypatch):
+    monkeypatch.setattr(storage, "_client", lambda: FakeClient("403"))
+    with pytest.raises(ClientError):
+        storage.object_exists(storage.CAPTURES_BUCKET, PATH)

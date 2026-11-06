@@ -20,7 +20,32 @@ python manage.py runserver
 
 Open http://127.0.0.1:8000/admin/ to see the data.
 
-Run tests: `pytest`. Lint: `ruff check .`
+Run tests: `pytest`. Lint: `ruff check .`. Migration check: `python manage.py makemigrations --check`.
+
+### Local Postgres (optional; SQLite is the default)
+
+```bash
+docker compose up -d db        # Postgres 16 as container hifadithi-db, db hifadithi
+# in backend/.env:
+DATABASE_URL=postgres://postgres@localhost:5432/hifadithi
+python manage.py migrate
+```
+
+The same container name/db is what `scripts/backup_db.sh` and `scripts/restore_drill.sh` expect.
+
+### Accounts API (Person A)
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| POST | `/api/auth/token/` | anyone | sign in → `{access, refresh}` |
+| POST | `/api/auth/token/refresh/` | anyone | refresh the access token |
+| GET | `/api/accounts/me/` | signed-in | the current user |
+| POST | `/api/accounts/invite/` | admin | invite staff → `{profile_id}` |
+| POST | `/api/accounts/<id>/role/` | admin | change a user's role (not your own) |
+| POST | `/api/accounts/<id>/deactivate/` | admin | deactivate a user (loses access now) |
+
+Errors use one shape: `{"error": {"code": "...", "message": "..."}}`. Restricted artefacts are
+filtered by `access.selectors.visible_artefacts(user)`.
 
 ## The status guard (read this before touching statuses)
 
