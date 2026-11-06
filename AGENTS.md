@@ -9,7 +9,9 @@ Team: Software Mahia. Round 3 is Monday 9 Nov 2026.
 - Backend: Django + Django REST Framework + simplejwt, in `backend/`.
 - Supabase is ONLY the hosted Postgres database and S3-compatible file storage.
   Do not use Supabase migrations, Edge Functions, row-level security, Cron or Auth.
-- Background jobs: django-q2 (Postgres as the queue).
+- Background work: no worker process (Render free plan). The Meshy webhook, a cron-job.org call
+  to the poll URL every 10 minutes and the job page finish jobs. django-q2 is installed but unused.
+- Python 3.12 everywhere (CI and Render use 3.12; Django 5.1 does not support 3.14).
 - 3D: Meshy (real) or FakeEngine (default in development).
 - The mobile app (Expo) lives in `mobile/` and comes later.
 

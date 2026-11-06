@@ -195,7 +195,11 @@ def apply_task_status(job, task):
 
         version = job.model_version
         try:
-            stored = copy_model(task.glb_url, model_path(version.artefact_id, version.version))
+            stored = copy_model(
+                task.glb_url,
+                model_path(version.artefact_id, version.version),
+                allowed=lambda url: model_url_allowed(url, job.engine),  # every redirect too
+            )
         except ModelCopyError as exc:
             mark_failed(job, str(exc))
             return job

@@ -8,8 +8,8 @@ from rest_framework.views import APIView
 from core.permissions import IsAdmin
 
 from .models import User
-from .serializers import InviteSerializer, UserSerializer
-from .services import deactivate_user, invite_staff
+from .serializers import InviteSerializer, RoleChangeSerializer, UserSerializer
+from .services import change_role, deactivate_user, invite_staff
 
 
 class MeView(APIView):
@@ -31,6 +31,19 @@ class InviteStaffView(APIView):
         data.is_valid(raise_exception=True)
         user = invite_staff(invited_by=request.user, **data.validated_data)
         return Response({"profile_id": user.pk}, status=status.HTTP_201_CREATED)
+
+
+class ChangeRoleView(APIView):
+    """Change another user's role (admin only). Nobody may change their own role."""
+
+    permission_classes = [IsAdmin]
+
+    def post(self, request, user_id):
+        user = get_object_or_404(User, pk=user_id)
+        data = RoleChangeSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        change_role(user=user, role=data.validated_data["role"], actor=request.user)
+        return Response(UserSerializer(user).data)
 
 
 class DeactivateUserView(APIView):
