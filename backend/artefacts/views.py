@@ -1,23 +1,61 @@
 """API endpoints for artefacts: keep them thin, call services. Owner: B."""
 from rest_framework import status
-from rest_framework.generics import CreateAPIView
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import ListCreateAPIView
+from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from core.permissions import IsResearcher
+from core.permissions import IsAdmin, IsCurator, IsResearcher
 
 from . import selectors, services
+from .models import CollectionStatus
 from .serializers import ArtefactSerializer
 
 
-class ArtefactCreateView(CreateAPIView):
-    """POST /api/artefacts/: researchers create a record (starts as a Draft)."""
+class ArtefactPagination(LimitOffsetPagination):
+    default_limit = 20
+    max_limit = 100
 
-    permission_classes = [IsResearcher]
+
+class ArtefactListCreateView(ListCreateAPIView):
+    """GET /api/artefacts/: search and list. POST /api/artefacts/: create a Draft record."""
+
     serializer_class = ArtefactSerializer
+    pagination_class = ArtefactPagination
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsResearcher()]
+        return [(IsResearcher | IsCurator | IsAdmin)()]
+
+    def get_queryset(self):
+        params = self.request.query_params
+        status_value = params.get("status", "")
+        if status_value and status_value not in CollectionStatus.values:
+            raise ValidationError(
+                {"status": f"Unknown status. Use one of: {', '.join(CollectionStatus.values)}."}
+            )
+        return selectors.list_visible_artefacts(
+            self.request.user,
+            q=params.get("q", "").strip(),
+            community=params.get("community", "").strip(),
+            object_type=params.get("object_type", "").strip(),
+            status=status_value,
+        )
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class ArtefactDetailView(APIView):
+    """GET /api/artefacts/{artefact_id}/: one artefact the user may see (else 404)."""
+
+    permission_classes = [IsResearcher | IsCurator | IsAdmin]
+
+    def get(self, request, artefact_id):
+        artefact = selectors.get_visible_artefact(request.user, artefact_id)
+        return Response(ArtefactSerializer(artefact).data)
 
 
 class StartCaptureView(APIView):

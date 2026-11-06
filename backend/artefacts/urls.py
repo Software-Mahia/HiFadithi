@@ -4,7 +4,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path("", views.ArtefactCreateView.as_view(), name="artefact-create"),
+    path("", views.ArtefactListCreateView.as_view(), name="artefact-list"),
+    path("<uuid:artefact_id>/", views.ArtefactDetailView.as_view(), name="artefact-detail"),
     path("<uuid:artefact_id>/captures/", views.StartCaptureView.as_view(), name="capture-start"),
     path(
         "captures/<uuid:capture_id>/complete/",
