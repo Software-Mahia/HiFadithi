@@ -199,6 +199,12 @@ def test_poll_finishes_ready_jobs(job, monkeypatch):
     assert response.data == {"checked": 1, "succeeded": 1, "failed": 0, "errors": 0}
 
 
+def test_poll_always_answers_json_even_when_a_browser_asks_for_html(job):
+    response = APIClient().get(f"/api/jobs/poll/{TOKEN}/", HTTP_ACCEPT="text/html")
+    assert response["Content-Type"].startswith("application/json")
+    assert len(response.content) < 200
+
+
 def test_poll_needs_the_token(job):
     assert APIClient().get("/api/jobs/poll/wrong/").status_code == 404
 
