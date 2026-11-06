@@ -4,8 +4,9 @@ from django.conf import settings
 from .base import Engine
 
 
-def get_engine() -> Engine:
-    if settings.ENGINE == "meshy":
+def get_engine(name: str | None = None) -> Engine:
+    """The engine called `name`, or settings.ENGINE. A job uses the engine that started it."""
+    if (name or settings.ENGINE) == "meshy":
         from .meshy import MeshyEngine
 
         return MeshyEngine()
