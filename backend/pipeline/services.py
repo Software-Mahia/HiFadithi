@@ -1,7 +1,14 @@
 """Everything in pipeline that WRITES. Owner: C.
 
-start_job(): turn a complete capture into a new ModelVersion and a 3D task.
+start_job():   turn a complete capture into a new ModelVersion and a 3D task.
+refresh_job(): ask the engine where a task stands and record it. The Meshy webhook, the
+               poll endpoint (cron-job.org, every 10 min) and the job page all use it.
+poll_jobs():   refresh every running job and fail the ones stuck for too long.
 """
+import logging
+from datetime import timedelta
+from urllib.parse import urlparse
+
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
@@ -16,7 +23,18 @@ from workflow.services import create_version, transition_model
 
 from .engines import get_engine
 from .engines.meshy import MeshyError
+from .model_files import ModelCopyError, copy_model, fill_model_version, model_path
 from .models import Job
+
+logger = logging.getLogger(__name__)
+
+# A job with no answer after this long is failed, so it never blocks the artefact forever.
+JOB_TIMEOUT = timedelta(minutes=30)
+# A job that never got a task id (the server stopped mid-start) is failed after this long.
+SUBMIT_TIMEOUT = timedelta(minutes=5)
+POLL_BATCH = 10  # jobs per poll call: keeps one call well inside cron-job.org's time limit
+# Meshy hands out model files from its own asset host (e.g. https://assets.meshy.ai/...).
+MESHY_MODEL_HOST_SUFFIX = ".meshy.ai"
 
 # Meshy fetches the photos when the task starts, but a task can wait in Meshy's queue.
 # Links are made fresh on every start and never reused.
@@ -133,3 +151,105 @@ def _check_credit_limit(ai_model):
             f"This month's Meshy credit limit ({settings.MESHY_MONTHLY_CREDIT_LIMIT}) "
             f"would be passed: {spent + pending} used or reserved, this job needs {cost}."
         )
+
+
+def refresh_job(job):
+    """Ask the engine for the task's status and record it. Returns the job, reloaded.
+
+    Never trusts a webhook body: the status always comes from the engine itself, so a
+    forged, repeated or out-of-order call can't change anything wrongly.
+    """
+    if not job.is_active or not job.task_id:
+        return job
+    task = get_engine(job.engine).get_status(job.task_id)
+    return apply_task_status(job, task)
+
+
+def apply_task_status(job, task):
+    """Record one TaskStatus on the job. Safe to call twice and in any order."""
+    with transaction.atomic():
+        # Lock the row: a webhook and a poll arriving together can't both copy the model.
+        job = Job.objects.select_for_update().select_related("model_version").get(pk=job.pk)
+        if not job.is_active:
+            return job  # already finished: ignore repeats and late arrivals
+
+        if task.status in ("PENDING", "IN_PROGRESS"):
+            job.status = Job.Status.RUNNING
+            job.progress = max(job.progress, min(int(task.progress or 0), 99))
+            job.save(update_fields=["status", "progress", "updated_at"])
+            return job
+
+        job.credits_used = task.credits_used
+        job.save(update_fields=["credits_used", "updated_at"])
+
+        if task.status != "SUCCEEDED":  # FAILED or CANCELED
+            mark_failed(job, task.error or f"The 3D task ended as {task.status.lower()}.")
+            return job
+        if not task.glb_url:
+            mark_failed(job, "The 3D task finished without a model file.")
+            return job
+
+        if not model_url_allowed(task.glb_url, job.engine):
+            mark_failed(job, "The 3D task's model link is not from the 3D service.")
+            return job
+
+        version = job.model_version
+        try:
+            stored = copy_model(task.glb_url, model_path(version.artefact_id, version.version))
+        except ModelCopyError as exc:
+            mark_failed(job, str(exc))
+            return job
+        fill_model_version(version, stored)
+
+        job.status = Job.Status.SUCCEEDED
+        job.progress = 100
+        job.finished_at = timezone.now()
+        job.save(update_fields=["status", "progress", "finished_at", "updated_at"])
+        transition_model(version, ModelVersion.Status.NEEDS_VERIFICATION, reason="3D model ready")
+        return job
+
+
+def model_url_allowed(url, engine_name):
+    """Only download models over https from the engine's own host.
+
+    Meshy: any *.meshy.ai host. FakeEngine: the host of FAKE_ENGINE_GLB_URL (our samples
+    bucket). Anything else is refused, so a bad status can never make us fetch another URL.
+    """
+    parsed = urlparse(url or "")
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or not host:
+        return False
+    if engine_name == "meshy":
+        return host == MESHY_MODEL_HOST_SUFFIX[1:] or host.endswith(MESHY_MODEL_HOST_SUFFIX)
+    fake_host = urlparse(getattr(settings, "FAKE_ENGINE_GLB_URL", "") or "").hostname
+    return bool(fake_host) and host == fake_host.lower()
+
+
+def poll_jobs(now=None):
+    """Refresh running jobs and fail stuck ones. Returns counts for the cron log."""
+    now = now or timezone.now()
+    counts = {"checked": 0, "succeeded": 0, "failed": 0, "errors": 0}
+
+    for job in Job.objects.filter(status=Job.Status.QUEUED, created_at__lt=now - SUBMIT_TIMEOUT):
+        mark_failed(job, "The job was never accepted by the 3D service.")
+        counts["failed"] += 1
+
+    running = Job.objects.filter(status=Job.Status.RUNNING).order_by("updated_at")[:POLL_BATCH]
+    for job in running:
+        if job.created_at < now - JOB_TIMEOUT:
+            mark_failed(job, "The 3D service took longer than 30 minutes.")
+            counts["failed"] += 1
+            continue
+        counts["checked"] += 1
+        try:
+            job = refresh_job(job)
+        except (MeshyError, ImproperlyConfigured) as exc:
+            # Meshy down for a moment: leave the job running, try again next time.
+            logger.warning("Could not refresh job %s: %s", job.id, exc)
+            counts["errors"] += 1
+            continue
+        if job.status == Job.Status.SUCCEEDED:
+            counts["succeeded"] += 1
+        elif job.status == Job.Status.FAILED:
+            counts["failed"] += 1
+    return counts
