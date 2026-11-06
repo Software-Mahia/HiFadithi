@@ -49,3 +49,35 @@ def test_job_page_shows_the_model_viewer(admin_client, job):
 
 def test_job_list_page_loads(admin_client, job):
     assert admin_client.get(reverse("admin:pipeline_job_changelist")).status_code == 200
+
+
+def test_check_progress_now_finishes_a_ready_job(
+    admin_client, job, monkeypatch, settings, tmp_path
+):
+    from functools import partial
+
+    import httpx
+    from django.core.files.storage import FileSystemStorage
+
+    from pipeline import model_files, services
+    from pipeline.engines.fake import FakeEngine
+
+    from .glb_factory import box_gltf, make_glb
+
+    settings.FAKE_ENGINE_GLB_URL = "https://samples.example.org/demo.glb"
+    glb = make_glb(box_gltf())
+    client = httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, content=glb)))
+    monkeypatch.setattr(services, "copy_model", partial(
+        model_files.copy_model, client=client, storage=FileSystemStorage(location=tmp_path)))
+    monkeypatch.setattr(services, "get_engine", lambda name=None: FakeEngine(
+        seconds=0, glb_url="https://samples.example.org/demo.glb"))
+    Job.objects.filter(pk=job.pk).update(status=Job.Status.RUNNING, task_id="fake-ok-1-abc")
+
+    page = admin_client.post(
+        reverse("admin:pipeline_job_changelist"),
+        {"action": "check_progress_now", "_selected_action": [job.pk]},
+        follow=True,
+    )
+
+    assert page.status_code == 200
+    assert Job.objects.get(pk=job.pk).status == Job.Status.SUCCEEDED

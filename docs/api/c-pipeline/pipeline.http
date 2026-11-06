@@ -1,0 +1,62 @@
+# HiFadithi: the 3D pipeline end to end (steps 1-5 of docs/e2e-script.md). Owner: C.
+# Works with the VS Code "REST Client" extension or JetBrains HTTP client.
+# Fill in the variables; never commit real passwords or tokens.
+
+@host = https://hifadithi-api.onrender.com
+@username = researcher-username
+@password = researcher-password
+
+### 1. Sign in as a researcher (copy "access" into @access below)
+POST {{host}}/api/auth/token/
+Content-Type: application/json
+
+{"username": "{{username}}", "password": "{{password}}"}
+
+###
+@access = paste-access-token-here
+
+### 2. Create an artefact (copy "id" into @artefact)
+POST {{host}}/api/artefacts/
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"nmk_accession_no": "TEST-001", "title": "Test object", "community": "Turkana",
+ "object_type": "Headdress", "height_mm": 300, "width_mm": 250, "depth_mm": 120}
+
+###
+@artefact = paste-artefact-id-here
+
+### 3a. Start a capture: returns the capture "id" and 4 upload links (1 hour, JPEG only)
+POST {{host}}/api/artefacts/{{artefact}}/captures/
+Authorization: Bearer {{access}}
+
+###
+@capture = paste-capture-id-here
+@upload_front = paste-upload_urls.front-here
+
+### 3b. Upload each photo with its own link (repeat for back, left, right).
+# Must send exactly Content-Type: image/jpeg. Use test photos only, never NMK photos here.
+PUT {{upload_front}}
+Content-Type: image/jpeg
+
+< ./front.jpg
+
+### 3c. Mark the capture complete (400 missing_views if a photo is missing)
+POST {{host}}/api/artefacts/captures/{{capture}}/complete/
+Authorization: Bearer {{access}}
+
+### 4. Start the 3D job (copy "id" into @job)
+POST {{host}}/api/jobs/
+Authorization: Bearer {{access}}
+Content-Type: application/json
+
+{"capture_id": "{{capture}}"}
+
+###
+@job = paste-job-id-here
+
+### 5. Check the job: repeat until "status" is "succeeded" (review_status needs_verification)
+GET {{host}}/api/jobs/{{job}}/
+Authorization: Bearer {{access}}
+
+### The model then shows in Admin → Pipeline → Jobs → this job.

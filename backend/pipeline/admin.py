@@ -4,13 +4,15 @@ Jobs are read-only: they change only through the pipeline services. A finished j
 shows its AI-assisted 3D model in a <model-viewer> preview.
 """
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.html import format_html
 
 from core.storage import MODELS_BUCKET, signed_download_url
 
+from .engines.meshy import MeshyError
 from .models import Job
+from .services import refresh_job
 
 # Google's <model-viewer> web component (npm @google/model-viewer), a fixed version.
 MODEL_VIEWER_JS = "https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"
@@ -36,6 +38,18 @@ class JobAdmin(admin.ModelAdmin):
                      "model_version__artefact__title")
     list_select_related = ("model_version__artefact",)
     readonly_fields = ["model_preview", "model_size"] + [f.name for f in Job._meta.fields]
+    actions = ["check_progress_now"]
+
+    @admin.action(description="Check progress now (ask the 3D service)")
+    def check_progress_now(self, request, queryset):
+        """For the demo: finish a job straight away instead of waiting for the poll."""
+        for job in queryset:
+            try:
+                job = refresh_job(job)
+            except (MeshyError, ImproperlyConfigured) as exc:
+                self.message_user(request, f"{job}: {exc}", level=messages.ERROR)
+                continue
+            self.message_user(request, f"{job}: {job.get_status_display()}, {job.progress}%")
 
     @admin.display(description="Artefact")
     def artefact(self, job):
