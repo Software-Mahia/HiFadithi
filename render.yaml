@@ -46,3 +46,10 @@ services:
         generateValue: true
       - key: MESHY_MONTHLY_CREDIT_LIMIT
         value: "300"
+      # First admin account (see build.sh). Remove the password from Render after first sign-in.
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
