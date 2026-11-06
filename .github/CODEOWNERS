@@ -1,12 +1,26 @@
-# Replace the placeholders with GitHub usernames.
-/backend/config/                @Joylynn's
-/backend/core/                  @Joylynn's
-/backend/core/storage.py        @Lewis's
-/backend/accounts/              @Joylynn's
-/backend/access/                @Joylynn's
-/backend/artefacts/             @Lewis's
-/scripts/                       @Lewis's
-/backend/pipeline/              @Tamira's
-/backend/workflow/              @Isaac's
-/backend/audit/                 @Isaac's
-/backend/narration/             @Isaac's
+# Code owners = whose approval a change in that path needs.
+# Review pairs: A reviews B, B reviews C, C reviews D, D reviews A.
+# Each path lists the slice owner AND its reviewer, so a normal same-slice PR
+# clears via the reviewer (the author cannot self-approve), and a cross-slice
+# edit still needs the path owner's approval.
+# A=@JoylynnWanjiru  B=@codingwithgitau  C=@TamiraAtieno1  D=@B1t-Master
+
+# A: foundations, access, CI  (reviewer: D)
+/.github/                       @JoylynnWanjiru @B1t-Master
+/backend/config/                @JoylynnWanjiru @B1t-Master
+/backend/core/                  @JoylynnWanjiru @B1t-Master
+/backend/accounts/              @JoylynnWanjiru @B1t-Master
+/backend/access/                @JoylynnWanjiru @B1t-Master
+
+# B: records, storage, backups  (reviewer: A)
+/backend/core/storage.py        @codingwithgitau @JoylynnWanjiru
+/backend/artefacts/             @codingwithgitau @JoylynnWanjiru
+/scripts/                       @codingwithgitau @JoylynnWanjiru
+
+# C: pipeline  (reviewer: B)
+/backend/pipeline/              @TamiraAtieno1 @codingwithgitau
+
+# D: lifecycle, audit, narration  (reviewer: C)
+/backend/workflow/              @B1t-Master @TamiraAtieno1
+/backend/audit/                 @B1t-Master @TamiraAtieno1
+/backend/narration/             @B1t-Master @TamiraAtieno1
