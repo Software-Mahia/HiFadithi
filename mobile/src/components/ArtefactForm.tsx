@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react";
-import { Alert, Modal, Pressable as RNPressable, View } from "react-native";
-import { Image } from "expo-image";
+import { Alert, Pressable as RNPressable } from "react-native";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
   createArtefact,
-  deleteArtefact,
   generate3D,
+  getNarration,
   saveNarration,
   updateArtefact,
   uploadPhoto,
@@ -23,7 +22,7 @@ import {
   SectionTitle,
   StackHeader,
 } from "./ui";
-import { colors, fonts, lh } from "../theme";
+import { colors } from "../theme";
 import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Pressable } from "@/components/ui/pressable";
@@ -70,8 +69,9 @@ export function ArtefactForm({
   });
   const [pending, setPending] = useState<Partial<Record<Slot, PhotoFile>>>({});
   const [heightMm, setHeightMm] = useState<string>(artefact?.height_mm || "");
-  const [heightOpen, setHeightOpen] = useState(false);
-  const [heightDraft, setHeightDraft] = useState("");
+  const [narrationStatus, setNarrationStatus] = useState<string | null>(
+    artefact?.narration?.status ?? null,
+  );
   const [busy, setBusy] = useState<string | null>(null);
 
   const isNew = !artefact;
@@ -107,6 +107,35 @@ export function ArtefactForm({
     return true;
   };
 
+  /** Narration synthesis is async (Piper runs in the queue worker). Poll the
+   * status and surface it inline; transient poll errors just retry. */
+  const pollNarration = (artefactId: string) => {
+    const stepMs = 2500;
+    const maxMs = 90_000;
+    const started = Date.now();
+    const tick = async () => {
+      try {
+        const narration = await getNarration(artefactId);
+        setNarrationStatus(narration.status);
+        if (narration.status === "ready") {
+          Alert.alert("Story audio ready", "Your narration has been generated.");
+          return;
+        }
+        if (narration.status === "failed") {
+          Alert.alert(
+            "Narration failed",
+            narration.error || "The story could not be synthesised.",
+          );
+          return;
+        }
+      } catch {
+        // transient poll failure; retry within the window
+      }
+      if (Date.now() - started < maxMs) setTimeout(tick, stepMs);
+    };
+    setTimeout(tick, stepMs);
+  };
+
   const persist = async (height: string | null) => {
     const saved = isNew
       ? await createArtefact(payload(height))
@@ -119,7 +148,9 @@ export function ArtefactForm({
     if (Object.keys(pending).length) setPending({});
 
     if (story.trim()) {
-      await saveNarration(saved.id, story.trim(), language);
+      const narration = await saveNarration(saved.id, story.trim(), language);
+      setNarrationStatus(narration.status);
+      if (narration.status === "generating") pollNarration(saved.id);
     }
     return saved;
   };
@@ -146,7 +177,7 @@ export function ArtefactForm({
     }
   };
 
-  const generate = async (height: string) => {
+  const generate = async (height: string | null) => {
     setBusy("generate");
     try {
       const saved = await persist(height);
@@ -168,29 +199,47 @@ export function ArtefactForm({
 
   const startGenerate = () => {
     if (!validate()) return;
-    const height = heightMm.trim() || artefact?.height_mm || "";
-    if (!height) {
-      setHeightDraft("");
-      setHeightOpen(true);
-      return;
-    }
+    const height = heightMm.trim() || artefact?.height_mm || null;
     generate(height);
   };
 
   const pickPhoto = async (slot: Slot) => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("Photo access needed", "Allow photo access to add artefact images.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.85,
-      allowsMultipleSelection: false,
-    });
-    if (result.canceled || !result.assets[0]) return;
-    const file = photoFromAsset(result.assets[0]);
+    // Native action sheet: the researcher can take a fresh photo or pick one.
+    const library = async () => {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Photo access needed", "Allow photo access to add artefact images.");
+        return;
+      }
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.85,
+        allowsMultipleSelection: false,
+      });
+      if (!picked.canceled && picked.assets[0]) acceptPhoto(slot, photoFromAsset(picked.assets[0]));
+    };
 
+    const camera = async () => {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert("Camera access needed", "Allow camera access to photograph artefacts.");
+        return;
+      }
+      const shot = await ImagePicker.launchCameraAsync({
+        mediaTypes: ["images"],
+        quality: 0.85,
+      });
+      if (!shot.canceled && shot.assets[0]) acceptPhoto(slot, photoFromAsset(shot.assets[0]));
+    };
+
+    Alert.alert("Add photo", undefined, [
+      { text: "Take photo", onPress: camera },
+      { text: "Photo library", onPress: library },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const acceptPhoto = async (slot: Slot, file: PhotoFile) => {
     if (isNew) {
       setPending((current) => ({ ...current, [slot]: file }));
       return;
@@ -205,25 +254,6 @@ export function ArtefactForm({
     } finally {
       setBusy(null);
     }
-  };
-
-  const remove = () => {
-    if (!artefact) return;
-    Alert.alert("Delete artefact?", "This removes the record, photos, model and narration.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteArtefact(artefact.id);
-            router.replace("/(tabs)/artefacts");
-          } catch (err) {
-            Alert.alert("Could not delete", err instanceof Error ? err.message : "Please try again.");
-          }
-        },
-      },
-    ]);
   };
 
   const scan = () => {
@@ -369,6 +399,19 @@ export function ArtefactForm({
         onChangeText={set("location")}
       />
 
+      <HStack className="gap-3">
+        <Box className="flex-1">
+          <Field
+            label="Height (mm)"
+            hint="Optional — used to scale the 3D model"
+            placeholder="e.g. 320"
+            value={heightMm}
+            onChangeText={setHeightMm}
+            keyboardType="numeric"
+          />
+        </Box>
+      </HStack>
+
       <Field
         label="Description"
         placeholder="Describe the artefact"
@@ -401,6 +444,29 @@ export function ArtefactForm({
         <Ionicons name="chevron-down" size={16} color={colors.muted} />
       </RNPressable>
 
+      {narrationStatus === "generating" ? (
+        <HStack className="items-center gap-1.5">
+          <Ionicons name="volume-high-outline" size={13} color={colors.amber} />
+          <Text className="flex-1 text-[10.5px] leading-[15px] text-amber">
+            Synthesising narration — hang on a few seconds…
+          </Text>
+        </HStack>
+      ) : narrationStatus === "ready" ? (
+        <HStack className="items-center gap-1.5">
+          <Ionicons name="checkmark-circle-outline" size={13} color={colors.teal} />
+          <Text className="flex-1 text-[10.5px] leading-[15px] text-teal">
+            Story audio is ready and saved with the record.
+          </Text>
+        </HStack>
+      ) : narrationStatus === "failed" ? (
+        <HStack className="items-center gap-1.5">
+          <Ionicons name="alert-circle-outline" size={13} color={colors.brick} />
+          <Text className="flex-1 text-[10.5px] leading-[15px] text-brick">
+            Narration failed — edit the story and save again.
+          </Text>
+        </HStack>
+      ) : null}
+
       <Button
         label="Generate 3D"
         icon="sparkles-outline"
@@ -408,92 +474,6 @@ export function ArtefactForm({
         loading={busy === "generate"}
         style={{ marginTop: 2 }}
       />
-
-      {!isNew ? (
-        <Pressable accessibilityRole="button" onPress={remove} className="items-center py-2">
-          <Text className="text-[12px] font-medium text-brick">Delete artefact</Text>
-        </Pressable>
-      ) : null}
-
-      {/* Height prompt — required by the 3D service but not drawn in the
-          mockup, so it only appears when a model is requested. */}
-      <Modal
-        visible={heightOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setHeightOpen(false)}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            padding: 24,
-            backgroundColor: "rgba(0,0,0,0.65)",
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 18,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: 18,
-              gap: 12,
-            }}
-          >
-            <HStack className="items-center gap-2">
-              <Image
-                source={require("../../assets/kit/characters/amani-camera.png")}
-                style={{ width: 44, height: 44 }}
-                contentFit="contain"
-              />
-              <VStack className="flex-1">
-                <Text
-                  className="text-foreground"
-                  style={{ fontFamily: fonts.semiBold, fontSize: 17, lineHeight: lh(23) }}
-                >
-                  Artefact height
-                </Text>
-                <Text className="text-[11px] leading-[16px] text-muted-foreground">
-                  The 3D engine needs a real height in millimetres.
-                </Text>
-              </VStack>
-            </HStack>
-            <Field
-              label="Height (mm)"
-              placeholder="320"
-              value={heightDraft}
-              onChangeText={setHeightDraft}
-              keyboardType="numeric"
-              autoFocus
-            />
-            <HStack className="gap-2">
-              <Box className="flex-1">
-                <Button
-                  label="Cancel"
-                  variant="secondary"
-                  onPress={() => setHeightOpen(false)}
-                />
-              </Box>
-              <Box className="flex-1">
-                <Button
-                  label="Continue"
-                  onPress={() => {
-                    const value = heightDraft.trim();
-                    if (!value || Number(value) <= 0) {
-                      Alert.alert("Height needed", "Enter a positive height in millimetres.");
-                      return;
-                    }
-                    setHeightMm(value);
-                    setHeightOpen(false);
-                    generate(value);
-                  }}
-                />
-              </Box>
-            </HStack>
-          </View>
-        </View>
-      </Modal>
     </Screen>
   );
 }

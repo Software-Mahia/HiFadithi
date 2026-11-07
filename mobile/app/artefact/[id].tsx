@@ -96,7 +96,8 @@ export default function PublicArtefactScreen() {
     );
   }
 
-  const cover = artefact.images?.find((image) => image.slot === "front")?.url || artefact.cover_image_url;
+  const cover =
+    artefact.images?.[0]?.url || artefact.cover_image_url;
   const narrationReady = artefact.narration?.status === "ready" && Boolean(artefact.narration.audio_url);
 
   const goBack = () => {

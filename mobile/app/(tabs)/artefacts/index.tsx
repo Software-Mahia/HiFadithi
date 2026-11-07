@@ -1,11 +1,11 @@
+import { Alert , StyleSheet } from "react-native";
 import { useCallback, useMemo, useState } from "react";
-import { StyleSheet } from "react-native";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { listArtefacts } from "../../../src/api";
+import { deleteArtefact, listArtefacts } from "../../../src/api";
 import type { Artefact, ArtefactStatus } from "../../../src/api";
 import { useAuth } from "../../../src/auth";
 import {
@@ -32,7 +32,7 @@ function routeFor(artefact: Artefact) {
   return `/artefact-record/${artefact.id}`;
 }
 
-function ArtefactRow({ artefact }: { artefact: Artefact }) {
+function ArtefactRow({ artefact, onDelete }: { artefact: Artefact; onDelete?: () => void }) {
   const thumb = artefact.cover_image_url || artefact.images?.[0]?.url;
   return (
     <Pressable
@@ -69,6 +69,18 @@ function ArtefactRow({ artefact }: { artefact: Artefact }) {
         status={artefact.status}
         label={artefact.status_label || artefact.status}
       />
+      {onDelete ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Delete artefact"
+          onPress={onDelete}
+          hitSlop={6}
+          className="h-8 w-8 items-center justify-center rounded-full"
+          style={{ backgroundColor: colors.elevated }}
+        >
+          <Ionicons name="trash-outline" size={15} color={colors.brick} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -202,7 +214,38 @@ export default function ArtefactListScreen() {
         ) : (
           <VStack className="gap-[9px]">
             {artefacts.map((artefact) => (
-              <ArtefactRow key={artefact.id} artefact={artefact} />
+              <ArtefactRow
+                key={artefact.id}
+                artefact={artefact}
+                onDelete={
+                  artefact.status === "processing"
+                    ? undefined
+                    : () =>
+                        Alert.alert(
+                          "Delete artefact?",
+                          `${artefact.name} will lose its record, photos, model and narration.`,
+                          [
+                            { text: "Cancel", style: "cancel" },
+                            {
+                              text: "Delete",
+                              style: "destructive",
+                              onPress: () => {
+                                deleteArtefact(artefact.id)
+                                  .then(load)
+                                  .catch((err) =>
+                                    Alert.alert(
+                                      "Could not delete",
+                                      err instanceof Error
+                                        ? err.message
+                                        : "Please try again.",
+                                    ),
+                                  );
+                              },
+                            },
+                          ],
+                        )
+                }
+              />
             ))}
           </VStack>
         )}

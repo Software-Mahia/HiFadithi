@@ -66,6 +66,11 @@ TEMPLATES = [
 DATABASE_URL = env("DATABASE_URL", default="") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
 DATABASES = {"default": env.db_url_config(DATABASE_URL)}
 DATABASES["default"]["CONN_MAX_AGE"] = 60
+# Local development is sqlite with several processes (web, qcluster worker);
+# give concurrent writers a short wait instead of an instant 'database is
+# locked' error (seconds in the sqlite backend's OPTIONS).
+if DATABASE_URL.startswith("sqlite"):
+    DATABASES["default"]["OPTIONS"] = {"timeout": 20}
 
 AUTH_USER_MODEL = "accounts.User"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

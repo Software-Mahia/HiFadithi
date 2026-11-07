@@ -16,8 +16,6 @@ function html(glbUrl: string) {
     <style>
       html, body { margin: 0; height: 100%; background: ${colors.ink}; overflow: hidden; }
       model-viewer { width: 100%; height: 100%; --poster-color: transparent; }
-      .hint { position: absolute; bottom: 12px; width: 100%; text-align: center;
-        color: rgba(255,255,255,.65); font: 12px -apple-system, system-ui, sans-serif; }
       #loader { position: absolute; inset: 0; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 12px;
         background: ${colors.ink}; transition: opacity .45s ease; }
@@ -49,7 +47,6 @@ function html(glbUrl: string) {
       interaction-prompt="auto"
       alt="3D model of the artefact">
     </model-viewer>
-    <div class="hint">Drag to rotate · Pinch to zoom</div>
     <script>
       (function () {
         const hook = () => {

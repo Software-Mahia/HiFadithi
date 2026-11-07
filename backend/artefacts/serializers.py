@@ -10,6 +10,7 @@ Two naming sets exist by design:
 from decimal import Decimal
 
 import rest_framework.serializers as serializers
+from rest_framework.validators import UniqueValidator
 
 from core import storage
 from core.storage import CAPTURES_BUCKET, MODELS_BUCKET
@@ -24,7 +25,11 @@ class ArtefactSerializer(serializers.ModelSerializer):
     """Superset output: B's canonical fields + the app contract + nested media."""
 
     # --- app-contract aliases (write + read) ---
-    accession_number = serializers.CharField(source="nmk_accession_no", required=False)
+    accession_number = serializers.CharField(
+        source="nmk_accession_no",
+        required=False,
+        validators=[UniqueValidator(queryset=Artefact.objects.all())],
+    )
     name = serializers.CharField(source="title", required=False)
     material = serializers.CharField(required=False)
 
@@ -65,13 +70,16 @@ class ArtefactSerializer(serializers.ModelSerializer):
             "height_mm": _MIN_DIMENSION,
             "width_mm": _MIN_DIMENSION,
             "depth_mm": _MIN_DIMENSION,
+            # canonical spellings stay writeable (B's contract) but no longer
+            # hard-required: the app creates/patches through the aliases alone
+            "nmk_accession_no": {"required": False},
+            "title": {"required": False},
         }
 
     def _cover(self, obj):
-        try:
-            return next(iter(obj.images.all()), None)
-        except Exception:  # images not prefetched, just query
-            return obj.images.first()
+        # The record's display photo is the FIRST image the researcher took,
+        # not whichever slot happens to sort first.
+        return obj.images.order_by("created_at").first()
 
     def get_cover_image_url(self, obj):
         image = self._cover(obj)
@@ -95,7 +103,8 @@ class ArtefactSerializer(serializers.ModelSerializer):
         return narration.status == NarrationStatus.READY
 
     def get_images(self, obj):
-        return ArtefactImageSerializer(obj.images.all(), many=True).data
+        # by capture time, so the app can trust images[0] = first photo taken
+        return ArtefactImageSerializer(obj.images.order_by("created_at"), many=True).data
 
     def get_model3d(self, obj):
         try:
@@ -118,6 +127,18 @@ class ArtefactSerializer(serializers.ModelSerializer):
         if created_by is None:
             return None
         return created_by.get_full_name() or created_by.get_username()
+
+    def validate(self, attrs):
+        # Require the artefact identity once, in either spelling (canonical or app alias),
+        # so neither the old nor the ported client can create an unnamed artefact.
+        errors = {}
+        if "nmk_accession_no" not in attrs and "accession_number" not in attrs:
+            errors["nmk_accession_no"] = ["This field is required."]
+        if "title" not in attrs and "name" not in attrs:
+            errors["title"] = ["This field is required."]
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def validate_height_mm(self, value):
         if value is not None and value <= 0:

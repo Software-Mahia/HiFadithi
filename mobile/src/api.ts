@@ -250,6 +250,34 @@ export function unpublishArtefact(id: string) {
 
 export type PhotoFile = { uri: string; name: string; type: string };
 
+/** Native-only multipart upload through the legacy FileSystem API. Expo's new
+ * fetch refuses `{uri…}` FormData parts ("Unsupported FormDataPart
+ * implementation"), so native file parts are sent around fetch entirely;
+ * the browser keeps using DOM FormData + Blob. */
+async function nativeUploadMultipart<T>(
+  path: string,
+  fieldName: string,
+  file: PhotoFile,
+  fields: Record<string, string> = {},
+): Promise<T> {
+  const result = await FileSystem.uploadAsync(`${API_URL}${path}`, file.uri, {
+    uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+    fieldName,
+    mimeType: file.type,
+    parameters: fields,
+    headers: {
+      Accept: "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+  });
+  const text = result.body || "";
+  const data = text ? (JSON.parse(text) as unknown) : null;
+  if (result.status >= 400) {
+    throw new ApiError(messageFrom(data), result.status, "upload_failed");
+  }
+  return data as T;
+}
+
 type PresignResponse = {
   slot: string;
   strategy: "direct" | "presigned";
@@ -292,15 +320,16 @@ export async function uploadPhoto(artefactId: string, slot: string, file: PhotoF
     });
   }
 
-  const form = new FormData();
-  form.append("slot", slot);
   if (Platform.OS === "web") {
+    const form = new FormData();
+    form.append("slot", slot);
     form.append("file", await toBlob(file.uri), file.name);
-  } else {
-    form.append("file", { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+    return request<ArtefactImage>(`/api/artefacts/${artefactId}/images/`, {
+      formData: form,
+    });
   }
-  return request<ArtefactImage>(`/api/artefacts/${artefactId}/images/`, {
-    formData: form,
+  return nativeUploadMultipart<ArtefactImage>(`/api/artefacts/${artefactId}/images/`, "file", file, {
+    slot,
   });
 }
 
@@ -344,11 +373,10 @@ export type OCRResult = {
 };
 
 export async function scanCard(file: PhotoFile) {
-  const form = new FormData();
-  if (Platform.OS === "web") {
-    form.append("image", await toBlob(file.uri), file.name);
-  } else {
-    form.append("image", { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  if (Platform.OS !== "web") {
+    return nativeUploadMultipart<OCRResult>("/api/ocr/", "image", file);
   }
+  const form = new FormData();
+  form.append("image", await toBlob(file.uri), file.name);
   return request<OCRResult>("/api/ocr/", { formData: form });
 }
