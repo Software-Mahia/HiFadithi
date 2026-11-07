@@ -170,7 +170,10 @@ def apply_task_status(job, task):
     """Record one TaskStatus on the job. Safe to call twice and in any order."""
     with transaction.atomic():
         # Lock the row: a webhook and a poll arriving together can't both copy the model.
-        job = Job.objects.select_for_update().select_related("model_version").get(pk=job.pk)
+        # Lock the job row alone: the joined rows are now nullable FKs
+        # (ported flow), and Postgres forbids FOR UPDATE on the nullable
+        # side of an outer join. Downstream writers lock their own rows.
+        job = Job.objects.select_for_update().get(pk=job.pk)
         if not job.is_active:
             return job  # already finished: ignore repeats and late arrivals
 
