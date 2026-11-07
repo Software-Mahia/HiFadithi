@@ -16,7 +16,7 @@ urlpatterns = [
     path("api/", include("pipeline.urls")),             # C: jobs/, webhooks/meshy/<token>/
     path("api/", include("workflow.urls")),             # D: versions/, verifications/, approvals/
     path("api/", include("narration.urls")),            # D: narration of an artefact
-    path("api/", include("artefacts.public_urls")),     # ported: guest gallery /api/public/artefacts/
+    path("api/", include("artefacts.public_urls")),     # ported: guest gallery
     path("api/", include("ocr.urls")),                  # ported: /api/ocr/
 ]
 

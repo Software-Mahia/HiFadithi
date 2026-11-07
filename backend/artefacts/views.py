@@ -119,6 +119,7 @@ class CompleteCaptureView(APIView):
 # --- ported from the hifadithi MVP: images (slot by slot), publish, public ---
 
 import logging  # noqa: E402
+
 from django.conf import settings  # noqa: E402
 from django.db.models import Q  # noqa: E402
 from django.http import StreamingHttpResponse  # noqa: E402
@@ -128,7 +129,7 @@ from rest_framework.permissions import AllowAny  # noqa: E402
 from core import storage  # noqa: E402
 from core.storage import CAPTURES_BUCKET  # noqa: E402
 
-from .models import Artefact, ArtefactStatus  # noqa: E402
+from .models import Artefact  # noqa: E402
 from .serializers import (  # noqa: E402
     ArtefactImageSerializer,
     ArtefactSerializer,
