@@ -82,7 +82,9 @@ def test_generate_narration_reports_missing_piper(artefact, monkeypatch):
         language="en",
         status=NarrationStatus.GENERATING,
     )
-    monkeypatch.setattr(services.shutil, "which", lambda name: None)
+    # _binary/_ffmpeg_bin: PATH + pip console scripts + imageio-ffmpeg fallbacks
+    monkeypatch.setattr(services, "_binary", lambda name: "")
+    monkeypatch.setattr(services, "_ffmpeg_bin", lambda: "")
     result = services.generate_narration(str(narration.id))
     assert result.status == NarrationStatus.FAILED
     assert "Piper" in result.error

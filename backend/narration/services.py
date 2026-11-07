@@ -2,8 +2,10 @@
 
 import hashlib
 import logging
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -80,18 +82,48 @@ def enqueue_narration(narration):
     async_task("narration.tasks.generate_narration_task", str(narration.id))
 
 
+def _binary(name):
+    """Find a command: PATH first, then this environment's bin dir (pip console
+    scripts, e.g. .venv/bin/piper) — the server process may not have the venv
+    on PATH, and resolving the interpreter symlink would escape the venv."""
+    found = shutil.which(name)
+    if found:
+        return found
+    for directory in (Path(sys.prefix) / "bin", Path(sys.executable).absolute().parent):
+        candidate = directory / name
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    return ""
+
+
+def _ffmpeg_bin():
+    """ffmpeg: PATH, pip console script, or the imageio-ffmpeg bundled binary."""
+    found = _binary(getattr(settings, "FFMPEG_BIN", "ffmpeg"))
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg  # pip package that ships a working ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except (ImportError, RuntimeError):
+        return ""
+
+
 def _synthesize_mp3(text, voice_path):
     """Run Piper to a temporary WAV, then ffmpeg to MP3. Returns the MP3 bytes."""
-    piper_bin = shutil.which(getattr(settings, "PIPER_BIN", "piper"))
+    piper_bin = _binary(getattr(settings, "PIPER_BIN", "piper"))
     if not piper_bin:
         raise RuntimeError("Piper is not installed. Install piper-tts or set PIPER_BIN.")
     if not Path(voice_path).exists():
         raise RuntimeError(
             f"Piper voice not found at {voice_path}. Download it with scripts/download_voices.sh."
         )
-    ffmpeg_bin = shutil.which(getattr(settings, "FFMPEG_BIN", "ffmpeg"))
+    ffmpeg_bin = _ffmpeg_bin()
     if not ffmpeg_bin:
-        raise RuntimeError("ffmpeg is not installed; it is needed to produce MP3 audio.")
+        raise RuntimeError(
+            "ffmpeg is not installed (pip install imageio-ffmpeg provides one); "
+            "it is needed to produce MP3 audio."
+        )
 
     with tempfile.TemporaryDirectory(prefix="hifadithi-tts-") as tmp:
         wav_path = Path(tmp) / "narration.wav"

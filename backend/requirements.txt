@@ -12,3 +12,5 @@ pytest>=8,<9
 pytest-django>=4.9,<5
 ruff>=0.6
 pytesseract
+piper-tts>=1.3,<2
+imageio-ffmpeg>=0.5,<1
