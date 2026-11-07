@@ -6,13 +6,14 @@ refresh_job(): ask the engine where a task stands and record it. The Meshy webho
 poll_jobs():   refresh every running job and fail the ones stuck for too long.
 """
 import logging
+from contextlib import suppress
 from datetime import timedelta
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import APIException
 
@@ -194,6 +195,8 @@ def apply_task_status(job, task):
             return job
 
         version = job.model_version
+        if not version:
+            return _finish_job_artefact_fast_flow(job, task)
         try:
             stored = copy_model(
                 task.glb_url,
@@ -211,6 +214,104 @@ def apply_task_status(job, task):
         job.save(update_fields=["status", "progress", "finished_at", "updated_at"])
         transition_model(version, ModelVersion.Status.NEEDS_VERIFICATION, reason="3D model ready")
         return job
+
+
+def _finish_job_artefact_fast_flow(job, task):
+    """Ported fast-flow success path (mobile app): no Capture row and no
+    ModelVersion review gates. The GLB is copied into the models bucket, written
+    onto the artefact's Model3D row, and the artefact becomes ready."""
+    from artefacts.services import mark_failed as artefact_mark_failed
+    from artefacts.services import mark_ready, replace_current_model
+
+    artefact = job.artefact
+    try:
+        stored = copy_model(
+            task.glb_url,
+            f"{artefact.id}/model.glb",
+            allowed=lambda url: model_url_allowed(url, job.engine),
+        )
+    except ModelCopyError as exc:
+        mark_failed(job, str(exc))
+        if artefact:
+            artefact_mark_failed(artefact)
+        return job
+
+    replace_current_model(artefact, glb_path=stored.path, size_bytes=stored.info.size_bytes)
+    mark_ready(artefact)
+    job.status = Job.Status.SUCCEEDED
+    job.progress = 100
+    job.finished_at = timezone.now()
+    job.save(update_fields=["status", "progress", "finished_at", "credits_used", "updated_at"])
+    return job
+
+
+# --- ported from the hifadithi MVP: artefact-slot jobs (mobile fast flow) -----
+
+
+def photo_urls_for_artefact(artefact, engine_name):
+    """Fresh download links for the app's four slot images, in VIEW_KEYS order."""
+    keys = []
+    for view in VIEW_KEYS:
+        image = artefact.images.filter(slot=view).first()
+        if image is None:
+            raise CaptureIncomplete()
+        keys.append(image.storage_path)
+    try:
+        return [
+            signed_download_url(CAPTURES_BUCKET, k, expires_in=PHOTO_LINK_SECONDS) for k in keys
+        ]
+    except ImproperlyConfigured:
+        if engine_name != "fake":
+            raise
+        # Laptop without Supabase keys: FakeEngine never downloads, any link will do.
+        return [f"local://{CAPTURES_BUCKET}/{k}" for k in keys]
+
+
+def start_job_for_artefact(*, artefact, user):
+    """Ported entry point: turn the app's four slot images + height into a 3D job.
+
+    Same engine plumbing as start_job(), but the artefact keeps its fast-flow
+    status (draft -> processing -> ready/failed via artefacts.services) instead
+    of the review-gated ModelVersion pipeline.
+    """
+    from artefacts.services import mark_processing, validate_generation_ready
+
+    validate_generation_ready(artefact)
+
+    engine_name = settings.ENGINE
+    ai_model = settings.MESHY_AI_MODEL if engine_name == "meshy" else ""
+
+    with transaction.atomic():
+        locked = type(artefact).objects.select_for_update().get(pk=artefact.pk)
+        if Job.objects.filter(
+            Q(artefact=locked) | Q(model_version__artefact=locked),
+            status__in=Job.ACTIVE,
+        ).exists():
+            raise JobAlreadyRunning()
+        if engine_name == "meshy":
+            _check_credit_limit(ai_model)
+        job = Job.objects.create(
+            artefact=locked, engine=engine_name, ai_model=ai_model, started_by=user
+        )
+
+    mark_processing(locked)
+
+    # Outside the transaction: the job is saved even if the engine call fails.
+    try:
+        engine = get_engine()
+        task_id = engine.submit(photo_urls_for_artefact(locked, engine_name))
+    except (MeshyError, ImproperlyConfigured, ValueError) as exc:
+        mark_failed(job, str(exc))
+        with suppress(Exception):
+            from artefacts.services import mark_failed as artefact_mark_failed
+
+            artefact_mark_failed(locked)
+        raise EngineUnavailable(f"The 3D service could not start the job: {exc}") from exc
+
+    job.task_id = task_id
+    job.status = Job.Status.RUNNING
+    job.save(update_fields=["task_id", "status", "updated_at"])
+    return job
 
 
 def model_url_allowed(url, engine_name):

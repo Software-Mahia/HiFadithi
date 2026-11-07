@@ -1,6 +1,8 @@
 """URLs for artefacts. Owner: B. Includes ported mobile-app routes."""
 from django.urls import path
 
+from pipeline import views as pipeline_views
+
 from . import views
 
 urlpatterns = [
@@ -21,4 +23,9 @@ urlpatterns = [
     path("<uuid:artefact_id>/publish/", views.PublishView.as_view(), name="artefact-publish"),
     path("<uuid:artefact_id>/unpublish/", views.UnpublishView.as_view(),
          name="artefact-unpublish"),
+    # ported fast-flow 3D pipeline (engine plumbing lives in workflow-owned pipeline app)
+    path("<uuid:artefact_id>/generate-3d/", pipeline_views.StartArtefactJobView.as_view(),
+         name="artefact-generate-3d"),
+    path("<uuid:artefact_id>/jobs/", pipeline_views.ArtefactJobsView.as_view(),
+         name="artefact-jobs"),
 ]
