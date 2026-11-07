@@ -87,7 +87,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return data as T;
 }
 
-export type Role = "researcher" | "admin";
+export type Role = "researcher" | "curator" | "admin";
 
 export type User = {
   id: number;
@@ -215,7 +215,9 @@ export function listArtefacts(query = "", status = "") {
   if (query) params.set("q", query);
   if (status) params.set("status", status);
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return request<Artefact[]>(`/api/artefacts/${suffix}`);
+  return request<{ count: number; results: Artefact[] } | Artefact[]>(
+    `/api/artefacts/${suffix}`
+  ).then((json) => (Array.isArray(json) ? json : (json?.results ?? [])));
 }
 
 export function getArtefact(id: string) {
