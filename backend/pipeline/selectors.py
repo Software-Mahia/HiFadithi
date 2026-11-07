@@ -1,4 +1,5 @@
 """Everything in pipeline that READS (other apps may import these). Owner: C."""
+from django.db.models import Q
 from rest_framework.exceptions import NotFound
 
 from access.selectors import visible_artefacts
@@ -15,8 +16,12 @@ def get_visible_capture(user, capture_id):
 
 
 def get_visible_job(user, job_id):
-    jobs = Job.objects.select_related("model_version", "capture").filter(
-        model_version__artefact__in=visible_artefacts(user)
+    jobs = (
+        Job.objects.select_related("model_version", "capture", "artefact")
+        .filter(
+            Q(model_version__artefact__in=visible_artefacts(user))
+            | Q(artefact__in=visible_artefacts(user))
+        )
     )
     try:
         return jobs.get(pk=job_id)

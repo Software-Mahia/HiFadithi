@@ -20,6 +20,27 @@ class CollectionStatus(models.TextChoices):
     WITHDRAWN = "withdrawn", "Withdrawn"
 
 
+class ArtefactStatus(models.TextChoices):
+    """Pipeline status of the 3D work (ported from the hifadithi MVP's fast flow).
+    Owned by the app services; unlike collection_status this is NOT workflow-guarded."""
+
+    DRAFT = "draft", "Draft"
+    PROCESSING = "processing", "Processing"
+    READY = "ready", "Ready"
+    PUBLISHED = "published", "Published"
+    FAILED = "failed", "Failed"
+
+
+class ImageSlot(models.TextChoices):
+    FRONT = "front", "Front"
+    BACK = "back", "Back"
+    LEFT = "left", "Left"
+    RIGHT = "right", "Right"
+
+
+SLOT_ORDER = {ImageSlot.FRONT: 0, ImageSlot.BACK: 1, ImageSlot.LEFT: 2, ImageSlot.RIGHT: 3}
+
+
 class Artefact(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nmk_accession_no = models.CharField(max_length=100, unique=True)
@@ -33,6 +54,16 @@ class Artefact(models.Model):
     width_mm = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     depth_mm = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
     extra_dimensions = models.JSONField(default=dict, blank=True)
+
+    # Museum-card fields (ported from the hifadithi MVP; the app's OCR scan and
+    # detail screen use these). material is singular here; materials stays as-is.
+    description = models.TextField(blank=True)
+    material = models.CharField(max_length=255, blank=True)
+    dimensions = models.CharField(max_length=255, blank=True)
+    date_or_period = models.CharField(max_length=255, blank=True)
+    provenance = models.TextField(blank=True)
+    donor = models.CharField(max_length=255, blank=True)
+    location = models.CharField(max_length=255, blank=True)
 
     cultural_protocols = models.TextField(blank=True)
     restricted = models.BooleanField(default=False)
@@ -50,6 +81,15 @@ class Artefact(models.Model):
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name="+",
     )
+
+    # Pipeline status (fast flow: draft -> processing -> ready -> published/failed).
+    # editable=False keeps it out of admin forms and B's serializers; only the
+    # artefacts service functions write it (see artefacts.services.set_status).
+    status = models.CharField(
+        max_length=20, choices=ArtefactStatus.choices,
+        default=ArtefactStatus.DRAFT, editable=False,
+    )
+    published_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -97,3 +137,52 @@ class Capture(models.Model):
 
     def __str__(self):
         return f"Capture {self.id} of {self.artefact_id}"
+
+
+class ArtefactImage(models.Model):
+    """One photo slot for the mobile app's flow (ported from the hifadithi MVP).
+
+    Capture (above) is slice C's all-four-at-once flow; the app uploads slot by
+    slot instead, so each slot is its own row with a unique path per artefact.
+    """
+
+    artefact = models.ForeignKey(Artefact, on_delete=models.CASCADE, related_name="images")
+    slot = models.CharField(max_length=10, choices=ImageSlot.choices)
+    storage_path = models.CharField(max_length=500)
+    content_type = models.CharField(max_length=100, default="image/jpeg")
+    size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    order = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "slot"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["artefact", "slot"], name="unique_image_slot_per_artefact"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        self.order = SLOT_ORDER.get(self.slot, 99)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.artefact_id} {self.slot}"
+
+
+class Model3D(models.Model):
+    artefact = models.OneToOneField(Artefact, on_delete=models.CASCADE, related_name="model3d")
+    glb_path = models.CharField(max_length=500)
+    scale_factor = models.FloatField(default=1.0)
+    size_bytes = models.PositiveBigIntegerField(null=True, blank=True)
+    triangles = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Model3D for {self.artefact_id}"
+
+
+class PublishedArtefactQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(status=ArtefactStatus.PUBLISHED)

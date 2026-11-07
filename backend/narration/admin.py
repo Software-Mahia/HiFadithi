@@ -1,10 +1,10 @@
-"""Django admin for narration: our demo screens. Owner: D.
+from django.contrib import admin
 
-Register: Story and Consent.
+from .models import Narration
 
-Status fields are never edited by hand. Use core.admin.ProtectedStatusAdminMixin to make
-them read-only, and core.admin.service_action() for buttons that call service functions.
-"""
-from django.contrib import admin  # noqa: F401
 
-from core.admin import ProtectedStatusAdminMixin, service_action  # noqa: F401
+@admin.register(Narration)
+class NarrationAdmin(admin.ModelAdmin):
+    list_display = ("artefact", "language", "status", "voice", "updated_at")
+    list_filter = ("status", "language")
+    readonly_fields = ("text_hash", "audio_path", "error", "updated_at")

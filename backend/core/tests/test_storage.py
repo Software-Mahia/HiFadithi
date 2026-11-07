@@ -64,10 +64,25 @@ def test_bad_paths_are_rejected(bad):
         storage.signed_download_url(storage.CAPTURES_BUCKET, bad)
 
 
-def test_missing_configuration_gives_a_clear_error(settings):
+def test_missing_configuration_falls_back_to_the_local_media_mirror(settings):
+    # Without Supabase S3 credentials the storage helpers serve local files
+    # from MEDIA_ROOT (ported behaviour from the hifadithi MVP), so a bare
+    # laptop checkout works with no cloud configuration.
     settings.AWS_S3_ENDPOINT_URL = None
-    with pytest.raises(ImproperlyConfigured, match="USE_SUPABASE_STORAGE"):
-        storage.signed_download_url(storage.CAPTURES_BUCKET, PATH)
+    settings.PUBLIC_BASE_URL = "http://127.0.0.1:8000"
+    settings.MEDIA_URL = "media/"
+    url = storage.signed_download_url(storage.CAPTURES_BUCKET, PATH)
+    assert url == "http://127.0.0.1:8000/media/captures/" + PATH
+    assert storage.upload_strategy() == "direct"
+    assert storage.signed_upload_url(storage.CAPTURES_BUCKET, PATH) is None
+
+
+def test_client_raises_when_storage_is_not_configured(settings):
+    # _client() itself requires Supabase S3 configuration (same call path as
+    # object_exists, open_stream and save_uploaded_file).
+    settings.AWS_S3_ENDPOINT_URL = None
+    with pytest.raises(ImproperlyConfigured):
+        storage._client()
 
 class FakeClient:
     def __init__(self, code=None):

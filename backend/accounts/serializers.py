@@ -21,10 +21,18 @@ class RoleChangeSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
+    # Ported: the mobile app's profile screen uses display_name + department.
+    display_name = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ("id", "username", "email", "full_name", "role", "is_active")
+        fields = (
+            "id", "username", "email", "full_name", "display_name", "role",
+            "department", "is_active",
+        )
 
     def get_full_name(self, obj):
         return obj.get_full_name()
+
+    def get_display_name(self, obj):
+        return obj.get_full_name() or obj.get_username()

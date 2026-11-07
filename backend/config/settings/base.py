@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "workflow",   # D
     "audit",      # D
     "narration",  # D
+    "ocr",        # ported: museum-card OCR for the mobile app
 ]
 
 MIDDLEWARE = [
@@ -65,6 +66,11 @@ TEMPLATES = [
 DATABASE_URL = env("DATABASE_URL", default="") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
 DATABASES = {"default": env.db_url_config(DATABASE_URL)}
 DATABASES["default"]["CONN_MAX_AGE"] = 60
+# Local development is sqlite with several processes (web, qcluster worker);
+# give concurrent writers a short wait instead of an instant 'database is
+# locked' error (seconds in the sqlite backend's OPTIONS).
+if DATABASE_URL.startswith("sqlite"):
+    DATABASES["default"]["OPTIONS"] = {"timeout": 20}
 
 AUTH_USER_MODEL = "accounts.User"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -92,7 +98,9 @@ MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # Supabase Storage through its S3-compatible API (owner: B).
-if env.bool("USE_SUPABASE_STORAGE", default=False):
+# Used by core.storage to switch between bucket URLs and the local MEDIA_ROOT mirror.
+USE_SUPABASE_STORAGE = env.bool("USE_SUPABASE_STORAGE", default=False)
+if USE_SUPABASE_STORAGE:
     STORAGES["default"] = {"BACKEND": "storages.backends.s3.S3Storage"}
     AWS_S3_ENDPOINT_URL = env("SUPABASE_S3_ENDPOINT")
     AWS_S3_REGION_NAME = env("SUPABASE_S3_REGION")
@@ -135,3 +143,30 @@ MESHY_API_KEY = env("MESHY_API_KEY", default="")
 MESHY_AI_MODEL = env("MESHY_AI_MODEL", default="meshy-6-lite")  # meshy-7.1 for the pilot
 MESHY_WEBHOOK_TOKEN = env("MESHY_WEBHOOK_TOKEN", default="")
 MESHY_MONTHLY_CREDIT_LIMIT = env.int("MESHY_MONTHLY_CREDIT_LIMIT", default=300)
+
+# --- Ported from the hifadithi MVP -------------------------------------------
+
+# Public base URL used in media links when Supabase Storage is off (local dev);
+# in production the mobile app bundles this so its images/audio resolve.
+PUBLIC_BASE_URL = env("PUBLIC_BASE_URL", default="http://127.0.0.1:8000").rstrip("/")
+
+# Presigned link lifetime for bucket URLs handed to the app.
+PRESIGN_EXPIRES_SECONDS = env.int("PRESIGN_EXPIRES_SECONDS", default=3600)
+
+# Artefact photo upload cap (the app's slot-by-slot images).
+MAX_IMAGE_BYTES = env.int("MAX_IMAGE_BYTES", default=10 * 1024 * 1024)
+
+# OCR (ported): pytesseract languages and image size cap.
+OCR_LANGUAGES = env("OCR_LANGUAGES", default="eng+swa")
+OCR_MAX_IMAGE_BYTES = env.int("OCR_MAX_IMAGE_BYTES", default=10 * 1024 * 1024)
+ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+# Narration/TTS (ported): Piper voice synthesizer, run via the piper-tts pip
+# package (PIPER_BIN defaults to the pip-installed console script) with MP3
+# conversion through the bundled ffmpeg from the imageio-ffmpeg package.
+PIPER_BIN = env("PIPER_BIN", default="piper")
+PIPER_VOICES_DIR = env("PIPER_VOICES_DIR", default=str(BASE_DIR / "voices"))
+PIPER_VOICE_EN = env("PIPER_VOICE_EN", default="en_US-lessac-medium.onnx")
+PIPER_VOICE_SW = env("PIPER_VOICE_SW", default="sw_CD-lanfrica-medium.onnx")
+PIPER_LENGTH_SCALE = env.float("PIPER_LENGTH_SCALE", default=1.0)
+FFMPEG_BIN = env("FFMPEG_BIN", default="ffmpeg")
