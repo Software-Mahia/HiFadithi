@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Alert, Pressable as RNPressable } from "react-native";
+import { Alert, Platform, Pressable as RNPressable } from "react-native";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,7 +13,7 @@ import {
   uploadPhoto,
 } from "../api";
 import type { Artefact, ArtefactImage, ArtifactDraft, PhotoFile } from "../api";
-import { photoFromAsset } from "../photos";
+import { pickImageFromLibrary, photoFromAsset } from "../photos";
 import {
   Button,
   Field,
@@ -206,6 +206,15 @@ export function ArtefactForm({
   };
 
   const pickPhoto = async (slot: Slot) => {
+    // Web (iPhone/desktop browsers): Alert.alert with buttons does nothing in
+    // react-native-web, so open the file input straight away. No await before this
+    // call, or the browser blocks the file dialog. iPhone's picker offers the camera.
+    if (Platform.OS === "web") {
+      const picked = await pickImageFromLibrary();
+      if (picked) acceptPhoto(slot, picked.photo);
+      return;
+    }
+
     // Native action sheet: the researcher can take a fresh photo or pick one.
     const library = async () => {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
