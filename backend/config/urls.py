@@ -30,5 +30,7 @@ if settings.DEBUG or not settings.USE_SUPABASE_STORAGE:
 # Same-origin web app. This catch-all serves the Expo web export at the site root
 # and MUST stay last so every /api, /admin, /healthz, /static and /media route is
 # matched before it. Owner: A.
-urlpatterns += [re_path(r"^(?P<path>.*)$", web_app, name="web-app")]
+urlpatterns += [
+    re_path(r"^(?!api/|admin|static/|media/|healthz)(?P<path>.*)$", web_app, name="web-app"),
+]
 
