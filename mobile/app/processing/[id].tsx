@@ -127,6 +127,7 @@ export default function ProcessingScreen() {
 
   const images = new Map((artefact.images || []).map((image) => [image.slot, image]));
   const progress = job?.progress ?? 0;
+  const hasStory = Boolean(narration?.story_text || artefact.narration?.story_text);
 
   return (
     <Screen safe={false} contentStyle={{ paddingTop: 0 }}>
@@ -202,27 +203,33 @@ export default function ProcessingScreen() {
           Building 3D model
         </Text>
         <Text className="max-w-[260px] text-center text-[12px] leading-[18px] text-muted-foreground">
-          Turning your photos into a 3D museum experience. You can leave this screen safely.
+          {hasStory
+            ? "Turning your photos into a 3D museum experience. You can listen while it finishes."
+            : "Your artefact is loading into a 3D museum experience. The percentage above shows the current progress."}
         </Text>
       </Card>
 
-      {narration?.status === "ready" && narration.audio_url ? (
+      {hasStory && narration?.status === "ready" && narration.audio_url ? (
         <VStack className="gap-2 pt-1">
           <Text className="text-[12px] font-semibold text-foreground">
             Listen while your model renders
           </Text>
           <NarrationPlayer url={narration.audio_url} label="Play the artefact story" />
         </VStack>
-      ) : narration?.status === "generating" ? (
+      ) : hasStory && narration?.status === "generating" ? (
         <Text className="pt-1 text-center text-[11px] leading-[17px] text-amber">
           Your story audio is being prepared and will appear here while the model renders.
         </Text>
       ) : null}
 
       <VStack className="gap-1 pt-1">
-        <Text className="text-[12px] font-semibold text-foreground">Generating geometry</Text>
+        <Text className="text-[12px] font-semibold text-foreground">
+          {hasStory ? "Generating geometry" : "Artefact loading"}
+        </Text>
         <Text className="text-[11px] leading-[17px] text-muted-foreground">
-          Usually takes a few minutes. You may safely exit.
+          {hasStory
+            ? "Usually takes a few minutes. You may safely exit."
+            : "You may safely exit; this screen will keep the latest progress."}
         </Text>
       </VStack>
 
