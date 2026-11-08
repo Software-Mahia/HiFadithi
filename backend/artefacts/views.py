@@ -135,6 +135,7 @@ from .serializers import (  # noqa: E402
     ArtefactSerializer,
     ConfirmImageSerializer,
     PresignImageSerializer,
+    PublicArtefactSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -308,7 +309,7 @@ class PublicArtefactListView(APIView):
                 | Q(nmk_accession_no__icontains=search)
                 | Q(description__icontains=search)
             )
-        return Response(ArtefactSerializer(queryset, many=True).data)
+        return Response(PublicArtefactSerializer(queryset, many=True).data)
 
 
 class PublicArtefactDetailView(APIView):
@@ -329,4 +330,4 @@ class PublicArtefactDetailView(APIView):
                 {"error": {"code": "not_found", "message": "Artefact not found."}},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        return Response(ArtefactSerializer(artefact).data)
+        return Response(PublicArtefactSerializer(artefact).data)

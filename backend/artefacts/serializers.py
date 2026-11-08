@@ -146,9 +146,81 @@ class ArtefactSerializer(serializers.ModelSerializer):
         return value
 
 
-def _validate_text_length(value, field, limit=255):
-    return value
+class PublicArtefactSerializer(serializers.ModelSerializer):
+    """Guest-gallery output: an explicit whitelist.
 
+    Everything staff-specific stays here: cultural_protocols, restricted,
+    collection_status, provenance/donor/location, the mm measurements the
+    engine needs but visitors don't, and any author fields. Whether any of
+    these should ever be public is an NMK decision; the whitelist keeps the
+    default closed and makes re-opening a field a one-line change.
+    Visitors still get the whole story: narration.serializers carries
+    story_text and audio_url, plus the photos and the 3D model.
+    """
+
+    name = serializers.CharField(source="title", read_only=True)
+    accession_number = serializers.CharField(source="nmk_accession_no", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    cover_image_url = serializers.SerializerMethodField()
+    has_model3d = serializers.SerializerMethodField()
+    narration_ready = serializers.SerializerMethodField()
+    images = serializers.SerializerMethodField()
+    model3d = serializers.SerializerMethodField()
+    narration = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Artefact
+        fields = (
+            "id", "accession_number", "name", "community", "object_type",
+            "description", "material", "dimensions", "date_or_period",
+            "status", "status_label", "published_at",
+            "cover_image_url", "has_model3d", "narration_ready",
+            "images", "model3d", "narration",
+        )
+
+    def _cover(self, obj):
+        # first photo the researcher took (same rule as the staff serializer)
+        return obj.images.order_by("created_at").first()
+
+    def get_cover_image_url(self, obj):
+        image = self._cover(obj)
+        if image is None:
+            return None
+        return storage.signed_download_url(CAPTURES_BUCKET, image.storage_path)
+
+    def get_has_model3d(self, obj):
+        try:
+            return obj.model3d is not None
+        except Exception:
+            return False
+
+    def get_narration_ready(self, obj):
+        from narration.models import NarrationStatus
+
+        try:
+            narration = obj.narration
+        except Exception:
+            return False
+        return narration.status == NarrationStatus.READY
+
+    def get_images(self, obj):
+        return ArtefactImageSerializer(obj.images.order_by("created_at"), many=True).data
+
+    def get_model3d(self, obj):
+        try:
+            model = obj.model3d
+        except Exception:
+            return None
+        return Model3DSerializer(model).data
+
+    def get_narration(self, obj):
+        try:
+            narration = obj.narration
+        except Exception:
+            return None
+        from narration.serializers import NarrationSerializer
+
+        return NarrationSerializer(narration).data
 
 
 class ArtefactImageSerializer(serializers.ModelSerializer):

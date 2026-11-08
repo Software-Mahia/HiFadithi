@@ -168,9 +168,11 @@ export default function PublicArtefactScreen() {
       <VStack className="rounded-[18px] bg-elevated px-[30px] py-[5px]">
         <DetailRow label="Material" value={artefact.material} />
         <DetailRow label="Date or period" value={artefact.date_or_period} />
-        <DetailRow label="Provenance" value={artefact.provenance} />
-        <DetailRow label="Location" value={artefact.location} />
-        <DetailRow label="Donor" value={artefact.donor} last />
+        <DetailRow
+          label="Dimensions"
+          value={artefact.dimensions}
+          last={!artefact.description}
+        />
       </VStack>
 
       {artefact.description ? (
