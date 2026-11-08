@@ -1,8 +1,18 @@
+import { useEffect, useMemo, useRef } from "react";
+import type { ForwardRefExoticComponent, RefAttributes } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { WebView } from "react-native-webview";
+import type { WebViewProps } from "react-native-webview";
 
 import { colors } from "../theme";
 import { Box } from "@/components/ui/box";
+
+// react-native-webview's bundled types declare WebView as a plain FunctionComponent
+// with no ref support, so React 19 rejects a ref prop. Re-type it to the handle we use.
+type WebViewHandle = { injectJavaScript: (script: string) => void };
+const RefWebView = WebView as unknown as ForwardRefExoticComponent<
+  WebViewProps & RefAttributes<WebViewHandle>
+>;
 
 function esc(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
@@ -70,6 +80,15 @@ function html(glbUrl: string, autoRotate: boolean) {
     <div class="hint">Drag to rotate · Pinch to zoom</div>
     <script>
       (function () {
+        // Live auto-rotate toggle: callers set rotation through this applier so the
+        // document is never rebuilt (no GLB re-download, no loader, no camera reset).
+        // The desired state is buffered until <model-viewer> is defined and wired.
+        let pendingRotate;
+        const applyRotate = () => {
+          const mv = document.querySelector("model-viewer");
+          if (mv && pendingRotate !== undefined) mv.autoRotate = pendingRotate;
+        };
+        window.__setAutoRotate = (v) => { pendingRotate = v; applyRotate(); };
         const hook = () => {
           const V = customElements.get("model-viewer");
           if (V) V.meshoptDecoderLocation =
@@ -99,6 +118,7 @@ function html(glbUrl: string, autoRotate: boolean) {
         // streams and decodes the scene.
         const wire = (mv) => {
           if (!mv) return;
+          applyRotate();
           mv.addEventListener("progress", (e) => update(e.detail && e.detail.totalProgress));
           const watch = () => mv.loaded ? done() : requestAnimationFrame(watch);
           requestAnimationFrame(watch);
@@ -116,11 +136,22 @@ function html(glbUrl: string, autoRotate: boolean) {
 }
 
 export function ModelViewer({ glbUrl, autoRotate = false, style }: { glbUrl: string; autoRotate?: boolean; style?: StyleProp<ViewStyle> }) {
+  const webRef = useRef<WebViewHandle>(null);
+  // The HTML is rebuilt only when glbUrl changes; autoRotate is baked in as the
+  // initial state and thereafter toggled live via injectJavaScript, so flipping
+  // rotation no longer reloads the WebView.
+  const initialRotate = useRef(autoRotate);
+  const source = useMemo(() => ({ html: html(glbUrl, initialRotate.current) }), [glbUrl]);
+  useEffect(() => {
+    initialRotate.current = autoRotate;
+    webRef.current?.injectJavaScript(`window.__setAutoRotate(${autoRotate ? "true" : "false"}); true;`);
+  }, [autoRotate]);
   return (
     <Box className="h-[340px] overflow-hidden rounded-[24px] border border-[#CFC5B8] bg-[#F2EFE9]" style={style}>
-      <WebView
+      <RefWebView
+        ref={webRef}
         originWhitelist={["*"]}
-        source={{ html: html(glbUrl, autoRotate) }}
+        source={source}
         style={{ flex: 1, backgroundColor: colors.museumLight }}
         javaScriptEnabled
         domStorageEnabled
