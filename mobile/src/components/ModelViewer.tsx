@@ -45,7 +45,7 @@ function html(glbUrl: string, autoRotate: boolean) {
   </head>
   <body>
     <div class="studio"></div>
-    <div class="museum-label">NATIONAL MUSEUM OF KENYA</div>
+    <div class="museum-label">NATIONAL MUSEUMS OF KENYA</div>
     <div id="loader">
       <div class="ring"><span class="pct" id="pct">0%</span></div>
       <span class="cap">Loading 3D model</span>
