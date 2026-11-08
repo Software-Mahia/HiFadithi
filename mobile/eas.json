@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "appVersionSource": "remote",
+    "requireCommit": false
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://cliff-aspect-textbooks-workshops.trycloudflare.com"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https:// REPLACE-WITH-DEPLOYED-API-URL"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

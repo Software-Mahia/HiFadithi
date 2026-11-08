@@ -199,6 +199,24 @@ def test_poll_finishes_ready_jobs(job, monkeypatch):
     assert response.data == {"checked": 1, "succeeded": 1, "failed": 0, "errors": 0}
 
 
+@pytest.mark.parametrize("accept", ["text/html", "*/*", "application/xml", ""])
+def test_poll_runs_and_answers_json_whatever_the_accept_header(job, monkeypatch, accept):
+    use_engine(monkeypatch, FakeEngine(seconds=0, glb_url=FAKE_GLB))
+    response = APIClient().get(f"/api/jobs/poll/{TOKEN}/", HTTP_ACCEPT=accept)
+    assert response.status_code == 200
+    assert response["Content-Type"].startswith("application/json")
+    assert response.json() == {"checked": 1, "succeeded": 1, "failed": 0, "errors": 0}
+
+
+def test_webhook_runs_whatever_the_accept_header(job, monkeypatch):
+    use_engine(monkeypatch, FakeEngine(seconds=0, glb_url=FAKE_GLB))
+    response = APIClient().post(
+        f"/api/webhooks/meshy/{TOKEN}/", {"id": job.task_id}, format="json", HTTP_ACCEPT="text/html"
+    )
+    assert response.status_code == 200
+    assert response.json() == {"status": "succeeded"}
+
+
 def test_poll_needs_the_token(job):
     assert APIClient().get("/api/jobs/poll/wrong/").status_code == 404
 

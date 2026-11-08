@@ -8,7 +8,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.permissions import AllowAny
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -17,8 +19,8 @@ from core.permissions import IsResearcher
 from .engines.meshy import MeshyError
 from .models import Job
 from .selectors import get_visible_capture, get_visible_job
-from .serializers import JobSerializer, StartJobSerializer
-from .services import poll_jobs, refresh_job, start_job
+from .serializers import JobSerializer, MobileJobSerializer, StartJobSerializer
+from .services import poll_jobs, refresh_job, start_job, start_job_for_artefact
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,21 @@ class JobDetailView(APIView):
                 job = refresh_job(job)
             except (MeshyError, ImproperlyConfigured) as exc:
                 logger.warning("Could not refresh job %s: %s", job.id, exc)
-        return Response(JobSerializer(job).data)
+        return Response(MobileJobSerializer(job).data)
+
+
+class _AlwaysJSON(BaseContentNegotiation):
+    """Ignore the caller's Accept header and always answer with the first renderer (JSON).
+
+    Monitors and cron services send all kinds of Accept headers; a 406 would stop the
+    poll from running at all.
+    """
+
+    def select_parser(self, request, parsers):
+        return parsers[0]
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return (renderers[0], renderers[0].media_type)
 
 
 class _TokenView(APIView):
@@ -59,6 +75,9 @@ class _TokenView(APIView):
 
     authentication_classes = []
     permission_classes = [AllowAny]  # the URL token below is the check
+    # Always a tiny JSON reply, never DRF's HTML page (cron services reject large responses).
+    renderer_classes = [JSONRenderer]
+    content_negotiation_class = _AlwaysJSON
 
     def check_token(self, token):
         expected = settings.MESHY_WEBHOOK_TOKEN
@@ -96,3 +115,38 @@ class PollJobsView(_TokenView):
         return Response(poll_jobs())
 
     post = get
+
+
+# --- ported from the hifadithi MVP: the app's fast-flow job endpoints --------
+
+
+class StartArtefactJobView(APIView):
+    """POST /api/artefacts/{id}/generate-3d/: make a 3D model from the app's
+    four slot images. Fast flow — the artefact goes processing -> ready/failed;
+    no Capture record and no review gates."""
+
+    permission_classes = [IsResearcher]
+
+    def post(self, request, artefact_id):
+        from artefacts.selectors import get_visible_artefact
+
+        artefact = get_visible_artefact(request.user, artefact_id)
+        job = start_job_for_artefact(artefact=artefact, user=request.user)
+        return Response(MobileJobSerializer(job).data, status=status.HTTP_201_CREATED)
+
+
+class ArtefactJobsView(APIView):
+    """GET /api/artefacts/{id}/jobs/: job history for the app's polling screens."""
+
+    permission_classes = [IsResearcher]
+
+    def get(self, request, artefact_id):
+        from django.db.models import Q
+
+        from artefacts.selectors import get_visible_artefact
+
+        artefact = get_visible_artefact(request.user, artefact_id)
+        jobs = Job.objects.filter(
+            Q(artefact=artefact) | Q(model_version__artefact=artefact)
+        ).order_by("-created_at")
+        return Response(MobileJobSerializer(jobs, many=True).data)
