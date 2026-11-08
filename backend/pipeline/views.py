@@ -8,7 +8,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
+from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.permissions import AllowAny
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -54,11 +56,28 @@ class JobDetailView(APIView):
         return Response(MobileJobSerializer(job).data)
 
 
+class _AlwaysJSON(BaseContentNegotiation):
+    """Ignore the caller's Accept header and always answer with the first renderer (JSON).
+
+    Monitors and cron services send all kinds of Accept headers; a 406 would stop the
+    poll from running at all.
+    """
+
+    def select_parser(self, request, parsers):
+        return parsers[0]
+
+    def select_renderer(self, request, renderers, format_suffix=None):
+        return (renderers[0], renderers[0].media_type)
+
+
 class _TokenView(APIView):
     """Called by machines (Meshy, cron-job.org), not people: the secret is in the URL."""
 
     authentication_classes = []
     permission_classes = [AllowAny]  # the URL token below is the check
+    # Always a tiny JSON reply, never DRF's HTML page (cron services reject large responses).
+    renderer_classes = [JSONRenderer]
+    content_negotiation_class = _AlwaysJSON
 
     def check_token(self, token):
         expected = settings.MESHY_WEBHOOK_TOKEN
