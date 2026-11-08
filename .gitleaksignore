@@ -1,0 +1,6 @@
+# gitleaks false positives to ignore, by fingerprint (<commit>:<file>:<rule>:<line>).
+# A test password literal in an invite-acceptance test tripped the generic-api-key
+# rule. It is test data, never a real credential. The current tree keeps such
+# passwords in named constants; this entry covers the retained historical commit
+# (kept alive by a closed PR's refs/pull/<n>/head) so the scan stays green.
+8aae548afe7eeff069cd91eb5e80ada08695b667:backend/accounts/tests/test_accept_invite_api.py:generic-api-key:97

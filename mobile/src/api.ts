@@ -203,6 +203,23 @@ export async function login(username: string, password: string) {
   });
 }
 
+/** Preview an invite link (who it is for) before showing the set-password form. */
+export async function invitePreview(uid: string, token: string) {
+  return request<{ email: string; full_name: string }>(
+    `/api/accounts/invite/accept/?uid=${encodeURIComponent(uid)}&token=${encodeURIComponent(token)}`,
+    { method: "GET", token: null },
+  );
+}
+
+/** Set the invited user's first password from an invite link, so they can sign in. */
+export async function acceptInvite(uid: string, token: string, password: string) {
+  return request<{ profile_id: number }>("/api/accounts/invite/accept/", {
+    method: "POST",
+    body: { uid, token, password },
+    token: null,
+  });
+}
+
 export function me(token?: string | null) {
   return request<User>("/api/accounts/me/", { token });
 }
