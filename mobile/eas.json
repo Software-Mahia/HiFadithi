@@ -17,13 +17,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://cliff-aspect-textbooks-workshops.trycloudflare.com"
+        "EXPO_PUBLIC_API_URL": "https://hifadithi-api.onrender.com"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https:// REPLACE-WITH-DEPLOYED-API-URL"
+        "EXPO_PUBLIC_API_URL": "https://hifadithi-api.onrender.com"
       }
     }
   },
