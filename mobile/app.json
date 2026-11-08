@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "HiFadithi",
+    "slug": "hifadithi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "hifadithi",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ke.hifadithi.app",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "HiFadithi uses your photos to add artefact images and read collection cards."
+      }
+    },
+    "android": {
+      "package": "ke.hifadithi.app",
+      "softInputMode": "adjustResize",
+      "adaptiveIcon": {
+        "backgroundColor": "#AC3931",
+        "foregroundImage": "./assets/kit/brand/app-icon-portrait.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HiFadithi uses your photos to add artefact images and read collection cards."
+        }
+      ],
+      "expo-secure-store",
+      "expo-audio",
+      "expo-font",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/kit/brand/app-icon-portrait.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F0B0B"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "6391695b-b6af-4e65-bbb1-21947dddfdc3"
+      }
+    },
+    "owner": "b1tmast3er"
+  }
+}

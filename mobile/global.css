@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@import 'uniwind';
+
+/* ─── HiFadithi dark tokens (measured from HiFadithi_Designs/*) ──────────
+   The mockups are binding: surfaces, borders and text are dark at all
+   times. There is deliberately no light variant. RGB triplets keep the
+   /opacity modifiers working in UniWind. */
+@layer theme {
+  :root {
+    color-scheme: dark;
+
+    --primary: 194 67 57;            /* Brick #C24339 */
+    --primary-foreground: 255 255 255;
+    --secondary: 234 160 0;          /* Amber #EAA000 */
+    --secondary-foreground: 18 15 14;
+    --tertiary: 0 180 194;           /* Teal #00B4C2 */
+
+    --card: 30 25 24;                /* Surface #1E1918 */
+    --background: 18 15 14;          /* Background #120F0E */
+    --popover: 42 35 33;             /* Elevated #2A2321 */
+    --popover-foreground: 245 239 234;
+
+    --muted: 42 35 33;               /* Elevated input fill */
+    --muted-foreground: 154 136 118; /* #9A8876 */
+    --destructive: 194 67 57;
+    --foreground: 245 239 234;       /* #F5EFEA */
+    --border: 53 38 36;              /* #352624 */
+    --input: 42 35 33;
+    --ring: 194 67 57;
+    --accent: 42 35 33;
+    --accent-foreground: 245 239 234;
+  }
+}
+
+/* ─── Tailwind v4 colour mappings ───────────────────────────────── */
+@theme inline {
+  --color-primary: rgb(var(--primary));
+  --color-primary-foreground: rgb(var(--primary-foreground));
+  --color-secondary: rgb(var(--secondary));
+  --color-secondary-foreground: rgb(var(--secondary-foreground));
+  --color-tertiary: rgb(var(--tertiary));
+  --color-card: rgb(var(--card));
+  --color-background: rgb(var(--background));
+  --color-popover: rgb(var(--popover));
+  --color-popover-foreground: rgb(var(--popover-foreground));
+  --color-muted: rgb(var(--muted));
+  --color-muted-foreground: rgb(var(--muted-foreground));
+  --color-destructive: rgb(var(--destructive));
+  --color-foreground: rgb(var(--foreground));
+  --color-border: rgb(var(--border));
+  --color-input: rgb(var(--input));
+  --color-ring: rgb(var(--ring));
+  --color-accent: rgb(var(--accent));
+  --color-accent-foreground: rgb(var(--accent-foreground));
+
+  /* Measured dark surfaces + brand accents. */
+  --color-surface: #1E1918;
+  --color-elevated: #2A2321;
+  --color-splash: #0F0B0B;
+  --color-borderc: #352624;
+  --color-brick: #C24339;
+  --color-brickdark: #AA2216;
+  --color-deepred: #7D231E;
+  --color-amber: #EAA000;
+  --color-teal: #00B4C2;
+  --color-info: #3A7CA5;
+  --color-draft: #8A7F7B;
+  --color-ink: #0F0B0B;
+  --color-paper: #120F0E;
+  --color-line: #352624;
+  --color-success: #00B4C2;
+
+  /* Line-height caps: never above 1.5. */
+  --text-lg--line-height: 1.5;
+  --text-base--line-height: 1.5;
+  --text-xl--line-height: 1.4;
+}
+
+/* ─── Poppins is the single typeface ─────────────────────────────
+   Weight variants ship as separate families (@expo-google-fonts);
+   map the token names used by gluestack's font-body/font-sans.     */
+@theme inline {
+  --font-body: "Poppins_400Regular";
+  --font-sans: "Poppins_400Regular";
+}
