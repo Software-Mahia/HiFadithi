@@ -141,10 +141,12 @@ export function ArtefactForm({
       ? await createArtefact(payload(height))
       : await updateArtefact(artefact!.id, payload(height));
 
-    for (const slot of SLOTS) {
-      const file = pending[slot.key];
-      if (file) await uploadPhoto(saved.id, slot.key, file);
-    }
+    await Promise.all(
+      SLOTS.map((slot) => {
+        const file = pending[slot.key];
+        return file ? uploadPhoto(saved.id, slot.key, file) : Promise.resolve();
+      }),
+    );
     if (Object.keys(pending).length) setPending({});
 
     if (story.trim()) {
