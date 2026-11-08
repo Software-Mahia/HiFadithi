@@ -186,6 +186,7 @@ def generate_narration(narration_id):
     narration.audio_path = path
     narration.status = NarrationStatus.READY
     narration.error = ""
+    narration.voice = Path(voice_path).name  # keep the row honest about the voice used
     narration.save(update_fields=["audio_path", "status", "error", "updated_at"])
     if old_path and old_path != path:
         storage.delete_file(NARRATION_BUCKET, old_path)

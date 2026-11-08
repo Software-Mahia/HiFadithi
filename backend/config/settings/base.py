@@ -166,7 +166,7 @@ ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"]
 # conversion through the bundled ffmpeg from the imageio-ffmpeg package.
 PIPER_BIN = env("PIPER_BIN", default="piper")
 PIPER_VOICES_DIR = env("PIPER_VOICES_DIR", default=str(BASE_DIR / "voices"))
-PIPER_VOICE_EN = env("PIPER_VOICE_EN", default="en_US-lessac-medium.onnx")
+PIPER_VOICE_EN = env("PIPER_VOICE_EN", default="en_GB-alba-medium.onnx")
 PIPER_VOICE_SW = env("PIPER_VOICE_SW", default="sw_CD-lanfrica-medium.onnx")
 PIPER_LENGTH_SCALE = env.float("PIPER_LENGTH_SCALE", default=1.0)
 FFMPEG_BIN = env("FFMPEG_BIN", default="ffmpeg")
