@@ -1,10 +1,10 @@
 """URL map. Each owner adds ONE include() line for their app. Owner: A."""
 from django.conf import settings
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import include, path, re_path
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from core.views import healthz
+from core.views import healthz, web_app
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
@@ -26,4 +26,9 @@ if settings.DEBUG or not settings.USE_SUPABASE_STORAGE:
     from django.conf.urls.static import static
 
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Same-origin web app. This catch-all serves the Expo web export at the site root
+# and MUST stay last so every /api, /admin, /healthz, /static and /media route is
+# matched before it. Owner: A.
+urlpatterns += [re_path(r"^(?P<path>.*)$", web_app, name="web-app")]
 
