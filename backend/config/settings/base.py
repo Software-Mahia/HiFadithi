@@ -124,6 +124,11 @@ SIMPLE_JWT = {
 }
 
 # Background tasks (django-q2) using the database as the queue: no Redis needed.
+# Q_SYNC=True runs each task inside the request instead of a worker process —
+# used on Render's free plan, which has no background workers (narration then
+# takes a few seconds directly in the API call; the 3D pipeline never needed
+# the worker: webhook + job page + poll keep it moving). Local dev defaults
+# to False so `manage.py qcluster` behaves normally.
 Q_CLUSTER = {
     "name": "hifadithi",
     "orm": "default",
@@ -131,6 +136,7 @@ Q_CLUSTER = {
     "timeout": 120,
     "retry": 180,
 }
+Q_CLUSTER["sync"] = env.bool("Q_SYNC", default=False)
 
 # Meshy (owner: C)
 ENGINE = env("ENGINE", default="fake")

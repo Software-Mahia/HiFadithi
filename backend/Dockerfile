@@ -30,11 +30,13 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 RUN pip install "piper-tts>=1.3,<2" || echo "piper-tts unavailable; set PIPER_BIN to a bundled binary"
 
 # Voice files are gitignored (181 MB), so they are fetched into the image at build
-# time. Renders rebuild on each deploy; the files are small enough for a free tier.
+# time; they stay in step with the settings defaults (Dockerfile context can't
+# read ../scripts). Renders rebuild on each deploy; the files are small enough
+# for a free tier.
 RUN mkdir -p /app/voices && \
     base="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0" && \
     for voice in \
-        "en/en_US/lessac/medium/en_US-lessac-medium" \
+        "en/en_GB/alba/medium/en_GB-alba-medium" \
         "sw/sw_CD/lanfrica/medium/sw_CD-lanfrica-medium"; do \
         name="$(basename "$voice")"; \
         curl -fL --retry 3 --retry-delay 2 -o "/app/voices/$name.onnx" "$base/$voice.onnx"; \

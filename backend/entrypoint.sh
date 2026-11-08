@@ -54,6 +54,11 @@ if [ -n "${DJANGO_SUPERUSER_USERNAME:-}" ]; then
     python manage.py createsuperuser --no-input || echo "Admin account already exists, skipping."
 fi
 
+# Demo records DEMO-001..005, create-only (safe on every deploy). SEED_DEMO=1 to enable.
+if [ "${SEED_DEMO:-}" = "1" ]; then
+    python manage.py seed_demo --force || echo "seed_demo failed, see log above"
+fi
+
 case "$role" in
     web)
         python manage.py collectstatic --noinput
