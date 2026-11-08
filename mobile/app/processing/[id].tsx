@@ -3,8 +3,8 @@ import { Image } from "expo-image";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
-import { getArtefact, getJob, listJobs } from "../../src/api";
-import type { Artefact, Job } from "../../src/api";
+import { getArtefact, getJob, getNarration, listJobs } from "../../src/api";
+import type { Artefact, Job, Narration } from "../../src/api";
 import {
   Button,
   Card,
@@ -19,6 +19,7 @@ import { Box } from "@/components/ui/box";
 import { HStack } from "@/components/ui/hstack";
 import { Text } from "@/components/ui/text";
 import { VStack } from "@/components/ui/vstack";
+import { NarrationPlayer } from "../../src/components/NarrationPlayer";
 
 const LABELS = [
   { key: "front", label: "Front" },
@@ -31,6 +32,7 @@ export default function ProcessingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [artefact, setArtefact] = useState<Artefact | null>(null);
   const [job, setJob] = useState<Job | null>(null);
+  const [narration, setNarration] = useState<Narration | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -67,7 +69,7 @@ export default function ProcessingScreen() {
   useEffect(() => {
     if (!job || job.status === "succeeded" || job.status === "failed") return;
     let cancelled = false;
-    const timer = setInterval(async () => {
+    const refresh = async () => {
       try {
         const latest = await getJob(job.id);
         if (cancelled) return;
@@ -82,12 +84,33 @@ export default function ProcessingScreen() {
       } catch {
         // A transient poll failure is fine; the next tick retries.
       }
-    }, 1600);
+    };
+    refresh();
+    const timer = setInterval(refresh, 1600);
     return () => {
       cancelled = true;
       clearInterval(timer);
     };
   }, [job?.id, job?.status, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!id || narration?.status === "ready" || narration?.status === "failed") return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const latest = await getNarration(id);
+        if (!cancelled) setNarration(latest);
+      } catch {
+        // Narration is optional; keep the 3D progress screen usable if it is unavailable.
+      }
+    };
+    refresh();
+    const timer = setInterval(refresh, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [id, narration?.status]);
 
   if (loading) return <Loading label="Loading the 3D job…" />;
 
@@ -179,9 +202,22 @@ export default function ProcessingScreen() {
           Building 3D model
         </Text>
         <Text className="max-w-[260px] text-center text-[12px] leading-[18px] text-muted-foreground">
-          Turning your photos into a 3D museum experience
+          Turning your photos into a 3D museum experience. You can leave this screen safely.
         </Text>
       </Card>
+
+      {narration?.status === "ready" && narration.audio_url ? (
+        <VStack className="gap-2 pt-1">
+          <Text className="text-[12px] font-semibold text-foreground">
+            Listen while your model renders
+          </Text>
+          <NarrationPlayer url={narration.audio_url} label="Play the artefact story" />
+        </VStack>
+      ) : narration?.status === "generating" ? (
+        <Text className="pt-1 text-center text-[11px] leading-[17px] text-amber">
+          Your story audio is being prepared and will appear here while the model renders.
+        </Text>
+      ) : null}
 
       <VStack className="gap-1 pt-1">
         <Text className="text-[12px] font-semibold text-foreground">Generating geometry</Text>
