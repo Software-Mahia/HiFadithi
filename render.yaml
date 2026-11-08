@@ -20,8 +20,11 @@ services:
     plan: free
     region: frankfurt          # close to our Supabase project in Europe
     branch: prod               # deploys only what is merged into prod
-    rootDir: backend
-    dockerfilePath: Dockerfile
+    # Context is the repo root so the image can build the Expo web export from
+    # mobile/ (stage 1 of backend/Dockerfile) and serve it same-origin.
+    rootDir: .
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
     dockerCommand: /entrypoint.sh web
     healthCheckPath: /healthz/
     autoDeploy: true
