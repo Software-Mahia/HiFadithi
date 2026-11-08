@@ -60,14 +60,16 @@ services:
         sync: false
       - key: MESHY_API_KEY
         sync: false
+      # Dashboard-managed in case the demo switches to meshy-7.1
       - key: MESHY_AI_MODEL
-        value: meshy-6-lite
+        sync: false
       - key: MESHY_WEBHOOK_TOKEN
         generateValue: true
       - key: MESHY_MONTHLY_CREDIT_LIMIT
         value: "300"
       # Optional demo records DEMO-001..005, create-only on boot. Dashboard-managed
-      # so a Blueprint sync can't reset it (set True once in the dashboard).
+      # so a Blueprint sync can't reset it (set 1 in the dashboard; entrypoint
+      # checks the literal string "1").
       - key: SEED_DEMO
         sync: false
       # First admin account. Remove the password from Render after first sign-in.
