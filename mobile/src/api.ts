@@ -2,7 +2,13 @@ import { Platform } from "react-native";
 
 import * as FileSystem from "expo-file-system/legacy";
 
-const fallbackHost = Platform.OS === "android" ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000";
+// On web the app is served same-origin with the API, so default to the current
+// origin: one web build then works on localhost and the deployed host with no
+// baked-in URL. EXPO_PUBLIC_API_URL still overrides (e.g. a split web/API host).
+const webOrigin =
+  Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "";
+const fallbackHost =
+  webOrigin || (Platform.OS === "android" ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000");
 
 export const API_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackHost).replace(/\/$/, "");
 

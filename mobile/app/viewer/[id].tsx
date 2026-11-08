@@ -42,6 +42,7 @@ export default function ViewerScreen() {
   const [artefact, setArtefact] = useState<Artefact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [autoRotate, setAutoRotate] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -99,6 +100,11 @@ export default function ViewerScreen() {
             {artefact.accession_number}
           </Text>
         </VStack>
+        <ViewerButton
+          icon={autoRotate ? "pause-circle-outline" : "sync-outline"}
+          label={autoRotate ? "Stop automatic rotation" : "Start automatic rotation"}
+          onPress={() => setAutoRotate((value) => !value)}
+        />
       </HStack>
 
       {/* Canvas: full-bleed, no card chrome; fills everything below the header
@@ -110,6 +116,7 @@ export default function ViewerScreen() {
               ? publicModelUrl(artefact.id)
               : artefact.model3d.glb_url
           }
+          autoRotate={autoRotate}
           style={{ flex: 1, height: undefined }}
         />
       </Box>

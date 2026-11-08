@@ -88,6 +88,11 @@ USE_TZ = True  # stored in UTC, shown in Nairobi time
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# Same-origin web app: the Expo web export (mobile/dist) is served at the site
+# root so the browser app and the API share one origin (no CORS). In production
+# the deploy step (owner C) must place the build at this path inside the image.
+WEB_DIST = env("WEB_DIST", default=str(BASE_DIR.parent / "mobile" / "dist"))
+
 # File storage. Uploaded files: local folder by default, Supabase Storage when switched on.
 # Static files (admin CSS/JS): Django's default here; WhiteNoise in production.py.
 STORAGES = {

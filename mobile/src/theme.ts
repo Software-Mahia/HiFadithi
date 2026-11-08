@@ -35,6 +35,11 @@ export const colors = {
   ink: "#0F0B0B",
   paper: "#120F0E",
   line: "#352624",
+
+  // Light museum-gallery surfaces used only by the interactive 3D stage.
+  museumLight: "#F2EFE9",
+  museumFloor: "#D8D1C7",
+  museumInk: "#332C28",
 };
 
 // Poppins ships via @expo-google-fonts; weights are separate families, so
