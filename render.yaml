@@ -1,30 +1,43 @@
 # Render Blueprint for HiFadithi. Owner: C.
 # Render reads this when you choose New > Blueprint and pick this repository.
+# Ported: Docker runtime so the API can run tesseract (OCR) and Piper (TTS).
+#
+# IMPORTANT for the person deploying (Tamira):
+# - There is NO worker service: Render's free plan has no background workers,
+#   and nothing needs one. The 3D pipeline moves via the Meshy webhook, the
+#   job page, and a monitor hitting /api/jobs/poll/<MESHY_WEBHOOK_TOKEN>/
+#   every ~5 min (UptimeRobot or cron-job.org; it also keeps the free
+#   service awake and alerts if the site goes down).
+# - Narration runs in-request because Q_SYNC is True below.
+# - EDIT the existing web service in place; do NOT recreate it. A new
+#   service gets a new URL, which would break the Meshy webhook URL, the
+#   poll monitor and the app's EXPO_PUBLIC_API_URL.
 # Values marked `sync: false` are secrets: Render asks for them once, in its dashboard.
 services:
   - type: web
     name: hifadithi-api
-    runtime: python
+    runtime: docker
     plan: free
     region: frankfurt          # close to our Supabase project in Europe
     branch: prod               # deploys only what is merged into prod
     rootDir: backend
-    buildCommand: ./build.sh
-    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    dockerfilePath: Dockerfile
+    dockerCommand: web
     healthCheckPath: /healthz/
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.7"
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production
+      # Narration synthesizes inside the request (no worker on the free plan).
+      - key: Q_SYNC
+        value: "True"
       # Generate once with: python -c "import secrets; print(secrets.token_urlsafe(60))"
       - key: SECRET_KEY
         sync: false
       # Supabase session pooler string, ending in ?sslmode=require
       - key: DATABASE_URL
         sync: false
-      # Supabase Storage (S3 API)
+      # Supabase Storage (S3 API) — required in Docker: no persistent disk for /app/media
       - key: USE_SUPABASE_STORAGE
         value: "True"
       - key: SUPABASE_S3_ENDPOINT
@@ -35,21 +48,35 @@ services:
         sync: false
       - key: SUPABASE_S3_SECRET_ACCESS_KEY
         sync: false
-      # Meshy: stays on the fake engine until the first real job (Friday)
+      # Public base URL for media links handed to the app and the guest gallery.
+      # Exactly the deployed API URL, NO trailing slash — every media link
+      # (photos, narration MP3, GLB) embeds it.
+      - key: PUBLIC_BASE_URL
+        sync: false
+      # Meshy: dashboard-managed so a Blueprint sync can't flip the live
+      # engine — it stays on the dashboard's value (fake until a real
+      # MESHY_API_KEY is set)
       - key: ENGINE
-        value: fake
+        sync: false
       - key: MESHY_API_KEY
         sync: false
+      # Dashboard-managed in case the demo switches to meshy-7.1
       - key: MESHY_AI_MODEL
-        value: meshy-6-lite
+        sync: false
       - key: MESHY_WEBHOOK_TOKEN
         generateValue: true
       - key: MESHY_MONTHLY_CREDIT_LIMIT
         value: "300"
-      # First admin account (see build.sh). Remove the password from Render after first sign-in.
+      # Optional demo records DEMO-001..005, create-only on boot. Dashboard-managed
+      # so a Blueprint sync can't reset it (set 1 in the dashboard; entrypoint
+      # checks the literal string "1").
+      - key: SEED_DEMO
+        sync: false
+      # First admin account. Remove the password from Render after first sign-in.
       - key: DJANGO_SUPERUSER_USERNAME
         sync: false
       - key: DJANGO_SUPERUSER_EMAIL
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
+

@@ -94,15 +94,18 @@ def test_get_artefact_returns_fields_with_decimals_as_strings():
     response = client_for("curator").get(reverse("artefact-detail", args=[artefact.id]))
     assert response.status_code == 200
     body = response.json()
-    assert set(body) == {
+    # The ported mobile contract extends the payload; the canonical fields remain.
+    assert {
         "id", "nmk_accession_no", "title", "community", "object_type", "materials",
         "height_mm", "width_mm", "depth_mm", "extra_dimensions",
         "cultural_protocols", "restricted", "collection_status",
         "created_at", "updated_at",
-    }
+        "accession_number", "name", "material", "status", "status_label",
+    } <= set(body)
     assert body["height_mm"] == "450.5"
     assert body["width_mm"] is None
     assert body["collection_status"] == "draft"
+    assert body["status"] == "draft"  # ported fast-flow status starts as draft too
 
 
 def test_get_unknown_artefact_is_a_404():

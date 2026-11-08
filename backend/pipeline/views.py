@@ -19,8 +19,8 @@ from core.permissions import IsResearcher
 from .engines.meshy import MeshyError
 from .models import Job
 from .selectors import get_visible_capture, get_visible_job
-from .serializers import JobSerializer, StartJobSerializer
-from .services import poll_jobs, refresh_job, start_job
+from .serializers import JobSerializer, MobileJobSerializer, StartJobSerializer
+from .services import poll_jobs, refresh_job, start_job, start_job_for_artefact
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class JobDetailView(APIView):
                 job = refresh_job(job)
             except (MeshyError, ImproperlyConfigured) as exc:
                 logger.warning("Could not refresh job %s: %s", job.id, exc)
-        return Response(JobSerializer(job).data)
+        return Response(MobileJobSerializer(job).data)
 
 
 class _AlwaysJSON(BaseContentNegotiation):
@@ -115,3 +115,38 @@ class PollJobsView(_TokenView):
         return Response(poll_jobs())
 
     post = get
+
+
+# --- ported from the hifadithi MVP: the app's fast-flow job endpoints --------
+
+
+class StartArtefactJobView(APIView):
+    """POST /api/artefacts/{id}/generate-3d/: make a 3D model from the app's
+    four slot images. Fast flow — the artefact goes processing -> ready/failed;
+    no Capture record and no review gates."""
+
+    permission_classes = [IsResearcher]
+
+    def post(self, request, artefact_id):
+        from artefacts.selectors import get_visible_artefact
+
+        artefact = get_visible_artefact(request.user, artefact_id)
+        job = start_job_for_artefact(artefact=artefact, user=request.user)
+        return Response(MobileJobSerializer(job).data, status=status.HTTP_201_CREATED)
+
+
+class ArtefactJobsView(APIView):
+    """GET /api/artefacts/{id}/jobs/: job history for the app's polling screens."""
+
+    permission_classes = [IsResearcher]
+
+    def get(self, request, artefact_id):
+        from django.db.models import Q
+
+        from artefacts.selectors import get_visible_artefact
+
+        artefact = get_visible_artefact(request.user, artefact_id)
+        jobs = Job.objects.filter(
+            Q(artefact=artefact) | Q(model_version__artefact=artefact)
+        ).order_by("-created_at")
+        return Response(MobileJobSerializer(jobs, many=True).data)

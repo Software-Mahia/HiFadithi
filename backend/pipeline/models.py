@@ -19,9 +19,19 @@ class Job(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     model_version = models.ForeignKey(
-        "workflow.ModelVersion", on_delete=models.PROTECT, related_name="jobs"
+        "workflow.ModelVersion", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="jobs",
     )
-    capture = models.ForeignKey("artefacts.Capture", on_delete=models.PROTECT, related_name="jobs")
+    capture = models.ForeignKey(
+        "artefacts.Capture", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="jobs",
+    )
+    # Ported mobile fast flow: the job hangs off the artefact directly, using the
+    # app's slot-by-slot images; no Capture row and no ModelVersion review gates.
+    artefact = models.ForeignKey(
+        "artefacts.Artefact", null=True, blank=True, on_delete=models.CASCADE,
+        related_name="pipeline_jobs",
+    )
     engine = models.CharField(max_length=20)  # "fake" or "meshy"
     ai_model = models.CharField(max_length=40, blank=True)  # e.g. meshy-6-lite
     task_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
