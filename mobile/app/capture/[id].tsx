@@ -2,13 +2,12 @@ import { useCallback, useRef, useState, type ComponentRef } from "react";
 import { Alert } from "react-native";
 import { Image } from "expo-image";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { generate3D, getArtefact, uploadPhoto } from "../../src/api";
 import type { Artefact, ArtefactImage } from "../../src/api";
-import { photoFromAsset } from "../../src/photos";
+import { pickImageFromLibrary } from "../../src/photos";
 import { Button, Loading, Screen, StackHeader } from "../../src/components/ui";
 import { colors } from "../../src/theme";
 import { Box } from "@/components/ui/box";
@@ -140,13 +139,9 @@ export default function CaptureScreen() {
 
   const library = async () => {
     if (!current) return;
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.88,
-      allowsMultipleSelection: false,
-    });
-    if (picked.canceled || !picked.assets[0]) return;
-    await save(current.key, photoFromAsset(picked.assets[0]));
+    const picked = await pickImageFromLibrary();
+    if (!picked) return;
+    await save(current.key, picked.photo);
   };
 
   return (

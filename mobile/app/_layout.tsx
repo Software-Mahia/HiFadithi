@@ -18,6 +18,7 @@ import "@/global.css";
 
 import { AuthProvider } from "../src/auth";
 import { colors } from "../src/theme";
+import "../src/webAlert"; // web: make Alert.alert work in browsers
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* splash already dismissed */

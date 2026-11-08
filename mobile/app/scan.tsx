@@ -8,13 +8,12 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { useAuth } from "../src/auth";
 import { scanCard, type OCRResult } from "../src/api";
-import { photoFromAsset } from "../src/photos";
+import { pickImageFromLibrary } from "../src/photos";
 import { Button, Card, Screen, SectionTitle, StackHeader, Tag } from "../src/components/ui";
 import { colors } from "../src/theme";
 import { Box } from "@/components/ui/box";
@@ -105,14 +104,10 @@ export default function ScanScreen() {
   }
 
   const pickFromLibrary = async () => {
-    const picked = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.9,
-      allowsMultipleSelection: false,
-    });
-    if (picked.canceled || !picked.assets[0]) return;
-    setShot(picked.assets[0].uri);
-    await scanFile(photoFromAsset(picked.assets[0]));
+    const picked = await pickImageFromLibrary();
+    if (!picked) return;
+    setShot(picked.uri);
+    await scanFile(picked.photo);
   };
 
   const capture = async () => {
