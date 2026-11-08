@@ -48,12 +48,16 @@ services:
         sync: false
       - key: SUPABASE_S3_SECRET_ACCESS_KEY
         sync: false
-      # Public base URL for media links handed to the app and the guest gallery
+      # Public base URL for media links handed to the app and the guest gallery.
+      # Exactly the deployed API URL, NO trailing slash — every media link
+      # (photos, narration MP3, GLB) embeds it.
       - key: PUBLIC_BASE_URL
         sync: false
-      # Meshy: stays on the fake engine until the first real job (Friday)
+      # Meshy: dashboard-managed so a Blueprint sync can't flip the live
+      # engine — it stays on the dashboard's value (fake until a real
+      # MESHY_API_KEY is set)
       - key: ENGINE
-        value: fake
+        sync: false
       - key: MESHY_API_KEY
         sync: false
       - key: MESHY_AI_MODEL
@@ -62,9 +66,10 @@ services:
         generateValue: true
       - key: MESHY_MONTHLY_CREDIT_LIMIT
         value: "300"
-      # Optional demo records DEMO-001..005 on first boot; remove after the pilot
+      # Optional demo records DEMO-001..005, create-only on boot. Dashboard-managed
+      # so a Blueprint sync can't reset it (set True once in the dashboard).
       - key: SEED_DEMO
-        value: "False"
+        sync: false
       # First admin account. Remove the password from Render after first sign-in.
       - key: DJANGO_SUPERUSER_USERNAME
         sync: false
