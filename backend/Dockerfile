@@ -10,7 +10,7 @@
 # fall back to a Render Static Site for mobile/dist + django-cors-headers.
 FROM node:20-slim AS webbuild
 WORKDIR /web
-COPY mobile/package.json mobile/package-lock.json ./
+COPY mobile/package.json mobile/package-lock.json mobile/.npmrc ./
 RUN npm ci
 COPY mobile/ ./
 RUN npx expo export --platform web
