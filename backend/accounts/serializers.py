@@ -13,6 +13,15 @@ class InviteSerializer(serializers.Serializer):
     role = serializers.CharField(max_length=20)
 
 
+class AcceptInviteSerializer(serializers.Serializer):
+    """Input for invite acceptance. The link carries uid+token; the person picks
+    a password. Strength is checked in the service (422 weak_password)."""
+
+    uid = serializers.CharField()
+    token = serializers.CharField()
+    password = serializers.CharField(trim_whitespace=False)
+
+
 class RoleChangeSerializer(serializers.Serializer):
     """Input for role change. Role validated in the service (422 bad_role, not 400)."""
 
