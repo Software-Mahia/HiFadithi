@@ -7,31 +7,44 @@ function esc(value: string) {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 }
 
-function html(glbUrl: string) {
+function html(glbUrl: string, autoRotate: boolean) {
+  const rotationAttribute = autoRotate ? "auto-rotate" : "";
   return `<!doctype html>
 <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@4.0.0/dist/model-viewer.min.js"></script>
     <style>
-      html, body { margin: 0; height: 100%; background: ${colors.ink}; overflow: hidden; }
-      model-viewer { width: 100%; height: 100%; --poster-color: transparent; }
+      html, body { margin: 0; height: 100%; background: ${colors.museumLight}; overflow: hidden; }
+      .studio { position: absolute; inset: 0; overflow: hidden; background:
+        radial-gradient(ellipse at 50% 24%, rgba(255,255,255,.85), transparent 45%),
+        linear-gradient(180deg, ${colors.museumLight} 0%, ${colors.museumFloor} 100%); }
+      .studio::before { content: ""; position: absolute; left: -20%; right: -20%; bottom: -32%; height: 62%;
+        transform: perspective(420px) rotateX(58deg); transform-origin: center top;
+        background: repeating-linear-gradient(90deg, rgba(51,44,40,.13) 0 1px, transparent 1px 78px),
+          repeating-linear-gradient(0deg, rgba(51,44,40,.10) 0 1px, transparent 1px 54px); opacity: .65; }
+      model-viewer { position: absolute; inset: 0; width: 100%; height: 100%; --poster-color: transparent; background: transparent; }
+      .museum-label { position: absolute; left: 18px; top: 18px; color: ${colors.museumInk};
+        font: 600 10px system-ui, sans-serif; letter-spacing: 1.7px; z-index: 3; }
+      .museum-label::after { content: ""; display: block; width: 28px; height: 2px; margin-top: 8px; background: ${colors.amber}; }
       #loader { position: absolute; inset: 0; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 12px;
-        background: ${colors.ink}; transition: opacity .45s ease; }
+        background: ${colors.museumLight}; transition: opacity .45s ease; z-index: 4; }
       #loader.hidden { opacity: 0; pointer-events: none; }
       .ring { width: 72px; height: 72px; border-radius: 50%;
-        background: conic-gradient(#00B4C2 calc(var(--p, 0) * 1%), #2A2321 0);
+        background: conic-gradient(#00B4C2 calc(var(--p, 0) * 1%), #D8D1C7 0);
         display: flex; align-items: center; justify-content: center; position: relative; }
       .ring::after { content: ""; position: absolute; left: 50%; top: 50%;
         transform: translate(-50%, -50%); width: 57px; height: 57px;
-        border-radius: 50%; background: ${colors.ink}; }
+        border-radius: 50%; background: ${colors.museumLight}; }
       .pct { position: absolute; left: 0; right: 0; text-align: center;
-        font: 700 12px system-ui, sans-serif; color: #F5EFEA; z-index: 1; }
-      .cap { font: 500 12px system-ui, sans-serif; color: #9A8876; letter-spacing: .3px; }
+        font: 700 12px system-ui, sans-serif; color: ${colors.museumInk}; z-index: 1; }
+      .cap { font: 500 12px system-ui, sans-serif; color: #6E6259; letter-spacing: .3px; }
     </style>
   </head>
   <body>
+    <div class="studio"></div>
+    <div class="museum-label">NATIONAL MUSEUM OF KENYA</div>
     <div id="loader">
       <div class="ring"><span class="pct" id="pct">0%</span></div>
       <span class="cap">Loading 3D model</span>
@@ -39,10 +52,16 @@ function html(glbUrl: string) {
     <model-viewer
       src="${esc(glbUrl)}"
       camera-controls
-      auto-rotate
+      ${rotationAttribute}
       auto-rotate-delay="1200"
       rotation-per-second="18deg"
       shadow-intensity="1"
+      shadow-softness="0.85"
+      exposure="1.05"
+      tone-mapping="neutral"
+      camera-orbit="35deg 72deg auto"
+      min-camera-orbit="auto auto 55%"
+      max-camera-orbit="auto auto 130%"
       environment-image="neutral"
       interaction-prompt="auto"
       alt="3D model of the artefact">
@@ -97,18 +116,18 @@ function html(glbUrl: string) {
 /** Browser build of the model viewer: an iframe keeps the same model-viewer
  * document that the native WebView renders, so the 3D model is interactive
  * on every platform. */
-export function ModelViewer({ glbUrl, style }: { glbUrl: string; style?: Record<string, unknown> }) {
+export function ModelViewer({ glbUrl, autoRotate = false, style }: { glbUrl: string; autoRotate?: boolean; style?: Record<string, unknown> }) {
   return (
-    <Box className="h-[340px] overflow-hidden rounded-[24px] bg-[#1B1413]" style={style as never}>
+    <Box className="h-[340px] overflow-hidden rounded-[24px] border border-[#CFC5B8] bg-[#F2EFE9]" style={style as never}>
       {createElement("iframe", {
-        srcDoc: html(glbUrl),
+        srcDoc: html(glbUrl, autoRotate),
         title: "3D model of the artefact",
         allow: "fullscreen",
         style: {
           border: 0,
           width: "100%",
           height: "100%",
-          backgroundColor: colors.ink,
+          backgroundColor: colors.museumLight,
         },
       })}
     </Box>
