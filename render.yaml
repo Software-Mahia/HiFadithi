@@ -22,7 +22,7 @@ services:
     branch: prod               # deploys only what is merged into prod
     rootDir: backend
     dockerfilePath: Dockerfile
-    dockerCommand: web
+    dockerCommand: /entrypoint.sh web
     healthCheckPath: /healthz/
     autoDeploy: true
     envVars:
