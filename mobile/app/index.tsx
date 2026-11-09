@@ -28,15 +28,11 @@ export default function Index() {
         accessibilityLabel="Nairobi National Museum entrance"
       />
 
-      {/* Dark and amber overlays preserve the museum palette while keeping the
-          supplied entrance photo visible behind the welcome copy. */}
+      {/* Keep one uniform overlay across the full photo. A second partial-height
+          overlay creates a visible horizontal opacity boundary on web. */}
       <Box
         className="absolute inset-0"
         style={{ backgroundColor: "rgba(15, 11, 11, 0.52)" }}
-      />
-      <Box
-        className="absolute inset-x-0 bottom-0 h-3/4"
-        style={{ backgroundColor: "rgba(18, 15, 14, 0.58)" }}
       />
 
       <VStack className="flex-1 justify-between px-7 pb-10 pt-14">
