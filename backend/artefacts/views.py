@@ -289,15 +289,17 @@ def _not_found(message="Artefact not found."):
 class PublicArtefactModelView(APIView):
     """GET /api/public/artefacts/{id}/model/: stable, cacheable GLB stream.
 
-    Guests: preview artefacts only. Staff: any published artefact they may see
-    (the WebView cannot send a bearer token, so the app uses the signed
-    model3d.glb_url for staff instead; this branch serves API clients).
+    This is the URL the 3D viewer (a WebView/<model-viewer>) loads on web and
+    mobile, and the viewer cannot send a bearer token. So, as before the guest
+    preview cap, it serves any published, non-restricted artefact by id.
+    Restricted artefacts never stream. Ids are not discoverable by guests: the
+    list and detail endpoints are staff-only beyond the two-item preview.
     """
 
     permission_classes = [AllowAny]
 
     def get(self, request, artefact_id):
-        artefact = _readable_published(request).filter(pk=artefact_id).first()
+        artefact = _published_queryset().filter(pk=artefact_id).first()
         if artefact is None:
             return _not_found()
         model = getattr(artefact, "model3d", None)

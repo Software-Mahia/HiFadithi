@@ -111,12 +111,31 @@ def test_guest_cannot_open_an_artefact_outside_the_preview():
     hidden = _publish(1)
     _publish(2)
     _publish(3)
-    client = APIClient()
-    detail = client.get(reverse("public-artefact-detail", args=[hidden.id]))
-    model = client.get(reverse("public-artefact-model", args=[hidden.id]))
+    detail = APIClient().get(reverse("public-artefact-detail", args=[hidden.id]))
     assert detail.status_code == 404
     assert detail.json()["error"]["code"] == "not_found"
-    assert model.status_code == 404
+
+
+def test_model_stream_serves_published_by_id_but_never_restricted_or_unpublished():
+    """The 3D viewer cannot send a token, so the stream stays id-addressable for
+    published artefacts (as the shipped app expects) but never leaks restricted
+    or unpublished ones. No model file here, so a reachable record is 404
+    "No 3D model yet" and an unreachable one is 404 "Artefact not found"."""
+    published = _publish(1)
+    _publish(2)
+    _publish(3)
+    restricted = _publish(4, restricted=True)
+    draft = Artefact.objects.create(nmk_accession_no="NMK/D/9", title="Draft")
+    client = APIClient()
+
+    def message(artefact):
+        response = client.get(reverse("public-artefact-model", args=[artefact.id]))
+        assert response.status_code == 404
+        return response.json()["error"]["message"]
+
+    assert message(published) == "No 3D model yet."
+    assert message(restricted) == "Artefact not found."
+    assert message(draft) == "Artefact not found."
 
 
 def test_staff_can_open_an_artefact_outside_the_preview(settings):

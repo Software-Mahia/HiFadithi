@@ -7,6 +7,7 @@ into the private `models` bucket straight away and stores only our own path.
 
 With USE_SUPABASE_STORAGE off, files go to MEDIA_ROOT/models/ on your laptop instead.
 """
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -18,6 +19,9 @@ from django.core.files.storage import FileSystemStorage
 from core.storage import MODELS_BUCKET
 
 from .glb import GlbError, GlbInfo, read_glb_info
+from .textures import optimize_glb
+
+logger = logging.getLogger(__name__)
 
 MAX_GLB_BYTES = 100 * 1024 * 1024  # a 30k-triangle textured model is usually 5-20 MB
 DOWNLOAD_TIMEOUT = httpx.Timeout(15.0, connect=5.0)  # Meshy wants a webhook reply within ~25 s
@@ -62,6 +66,22 @@ def copy_model(
         info = read_glb_info(data)
     except GlbError as exc:
         raise ModelCopyError(f"Meshy's model file can't be used: {exc}") from exc
+
+    # Smaller textures = faster download and display on phones. Geometry is untouched;
+    # if the optimised file does not read back cleanly, the original is kept.
+    optimised, report = optimize_glb(data)
+    if report.images_changed:
+        try:
+            info = read_glb_info(optimised)
+            data = optimised
+            logger.info(
+                "Optimised model textures: %s -> %s bytes (%s images)",
+                report.before_bytes,
+                report.after_bytes,
+                report.images_changed,
+            )
+        except GlbError:
+            logger.warning("Optimised model did not read back; storing the original.")
 
     storage = storage or models_storage()
     if storage.exists(path):  # FileSystemStorage would otherwise save under a new name

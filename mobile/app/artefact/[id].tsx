@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { getPublicArtefact, publicModelUrl } from "../../src/api";
 import type { Artefact } from "../../src/api";
-import { useAuth } from "../../src/auth";
 import { ModelViewer } from "../../src/components/ModelViewer";
 import { NarrationPlayer } from "../../src/components/NarrationPlayer";
 import {
@@ -46,30 +45,24 @@ function HeaderButton({
 
 export default function PublicArtefactScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user, loading: authLoading } = useAuth();
   const [artefact, setArtefact] = useState<Artefact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    // Wait for the saved session: a signed-in researcher must not be served the guest view.
-    if (!id || authLoading) return;
+    if (!id) return;
     try {
       const data = await getPublicArtefact(id);
       setArtefact(data);
-      // Warm the model so the full-screen 3D view opens without a fresh
-      // download: the stream endpoint is cache-stable, so this fills the
-      // WebView/browser HTTP cache the viewer shares. Guests only: staff use
-      // the signed glb_url (the stream serves guests preview artefacts only).
-      if (!user && data.model3d && data.status === "published") {
-        fetch(publicModelUrl(data.id)).catch(() => {});
-      }
+      // No separate pre-fetch: the 3D viewer on this page loads the model itself
+      // and that fills the cache the full-screen viewer reuses. A pre-fetch here
+      // used a different cache on Android and downloaded the model again.
     } catch (err) {
       setError(err instanceof Error ? err.message : "This artefact is not available.");
     } finally {
       setLoading(false);
     }
-  }, [id, authLoading, user]);
+  }, [id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,7 +70,7 @@ export default function PublicArtefactScreen() {
     }, [load]),
   );
 
-  if (authLoading || loading) return <Loading label="Opening artefact…" />;
+  if (loading) return <Loading label="Opening artefact…" />;
 
   if (!artefact) {
     return (
@@ -121,7 +114,7 @@ export default function PublicArtefactScreen() {
       {artefact.model3d ? (
         <ModelViewer
           glbUrl={
-            !user && artefact.status === "published"
+            artefact.status === "published"
               ? publicModelUrl(artefact.id)
               : artefact.model3d.glb_url
           }
