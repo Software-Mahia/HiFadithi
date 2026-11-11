@@ -126,6 +126,7 @@ from django.http import StreamingHttpResponse  # noqa: E402
 from rest_framework.parsers import FormParser, MultiPartParser  # noqa: E402
 from rest_framework.permissions import AllowAny  # noqa: E402
 
+from access.selectors import visible_artefacts  # noqa: E402
 from core import storage  # noqa: E402
 from core.storage import CAPTURES_BUCKET  # noqa: E402
 
@@ -135,6 +136,7 @@ from .serializers import (  # noqa: E402
     ArtefactSerializer,
     ConfirmImageSerializer,
     PresignImageSerializer,
+    PublicArtefactPreviewSerializer,
     PublicArtefactSerializer,
 )
 
@@ -245,23 +247,59 @@ class UnpublishView(APIView):
         return Response({"id": artefact.id, "status": artefact.status})
 
 
+PREVIEW_LIMIT = 2
+
+
 def _published_queryset():
-    """Guest gallery: published, not restricted (BR-12 leaks nothing publicly)."""
+    """Published, not restricted (BR-12 leaks nothing publicly)."""
     return Artefact.objects.filter(status=ArtefactStatus.PUBLISHED, restricted=False)
 
 
+def _preview_queryset():
+    """The only artefacts a guest may see: the two most recently published ones.
+
+    Fixed size, no search, no pagination, so the full collection never leaves the
+    server for an anonymous caller.
+    """
+    ids = list(
+        _published_queryset()
+        .order_by("-published_at", "-created_at")
+        .values_list("pk", flat=True)[:PREVIEW_LIMIT]
+    )
+    return Artefact.objects.filter(pk__in=ids)
+
+
+_IsStaff = IsResearcher | IsCurator | IsAdmin
+
+
+def _readable_published(request):
+    """Staff read every published artefact visible_artefacts() allows; guests only the preview."""
+    if _IsStaff().has_permission(request, None):
+        return visible_artefacts(request.user).filter(status=ArtefactStatus.PUBLISHED)
+    return _preview_queryset()
+
+
+def _not_found(message="Artefact not found."):
+    return Response(
+        {"error": {"code": "not_found", "message": message}},
+        status=status.HTTP_404_NOT_FOUND,
+    )
+
+
 class PublicArtefactModelView(APIView):
-    """GET /api/public/artefacts/{id}/model/: stable, cacheable GLB stream."""
+    """GET /api/public/artefacts/{id}/model/: stable, cacheable GLB stream.
+
+    Guests: preview artefacts only. Staff: any published artefact they may see
+    (the WebView cannot send a bearer token, so the app uses the signed
+    model3d.glb_url for staff instead; this branch serves API clients).
+    """
 
     permission_classes = [AllowAny]
 
     def get(self, request, artefact_id):
-        artefact = _published_queryset().filter(pk=artefact_id).first()
+        artefact = _readable_published(request).filter(pk=artefact_id).first()
         if artefact is None:
-            return Response(
-                {"error": {"code": "not_found", "message": "Artefact not found."}},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return _not_found()
         model = getattr(artefact, "model3d", None)
         if model is None:
             return Response(
@@ -294,13 +332,19 @@ class PublicArtefactModelView(APIView):
 
 
 class PublicArtefactListView(APIView):
-    """GET /api/public/artefacts/: the guest gallery."""
+    """GET /api/public/artefacts/: the published gallery. Staff only.
 
-    permission_classes = [AllowAny]
+    Guests get the two-item preview from /api/public/artefacts/preview/ instead.
+    """
+
+    permission_classes = [IsResearcher | IsCurator | IsAdmin]
 
     def get(self, request):
-        queryset = _published_queryset().select_related("model3d", "narration").prefetch_related(
-            "images"
+        queryset = (
+            visible_artefacts(request.user)
+            .filter(status=ArtefactStatus.PUBLISHED)
+            .select_related("model3d", "narration")
+            .prefetch_related("images")
         )
         search = request.query_params.get("q", "").strip()
         if search:
@@ -313,21 +357,36 @@ class PublicArtefactListView(APIView):
 
 
 class PublicArtefactDetailView(APIView):
-    """GET /api/public/artefacts/{id}/: one published artefact."""
+    """GET /api/public/artefacts/{id}/: one published artefact.
+
+    Guests: preview artefacts only (anything else is a 404, so ids are not probed).
+    """
 
     permission_classes = [AllowAny]
 
     def get(self, request, artefact_id):
         artefact = (
-            _published_queryset()
+            _readable_published(request)
             .select_related("model3d", "narration")
             .prefetch_related("images")
             .filter(pk=artefact_id)
             .first()
         )
         if artefact is None:
-            return Response(
-                {"error": {"code": "not_found", "message": "Artefact not found."}},
-                status=status.HTTP_404_NOT_FOUND,
-            )
+            return _not_found()
         return Response(PublicArtefactSerializer(artefact).data)
+
+
+class PublicArtefactPreviewView(APIView):
+    """GET /api/public/artefacts/preview/: exactly the guest preview (at most two).
+
+    Takes no query parameters: no search, no paging, no way to widen it.
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        queryset = _preview_queryset().order_by("-published_at", "-created_at").prefetch_related(
+            "images"
+        ).select_related("model3d")
+        return Response(PublicArtefactPreviewSerializer(queryset, many=True).data)

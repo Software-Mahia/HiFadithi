@@ -14,7 +14,7 @@
 
 # B: records, storage, backups  (reviewer: A)
 /backend/core/storage.py        @codingwithgitau @JoylynnWanjiru
-/backend/artefacts/             @codingwithgitau @JoylynnWanjiru
+/backend/artefacts/             @TamiraAtieno1 @JoylynnWanjiru
 /scripts/                       @codingwithgitau @JoylynnWanjiru
 
 # C: pipeline  (reviewer: B)
