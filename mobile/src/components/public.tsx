@@ -66,35 +66,24 @@ export function BrandMark({ light = false }: { light?: boolean }) {
       onPress={() => router.replace("/")}
       style={styles.brand}
     >
-      <View style={styles.brandBadge}>
+      <View style={{ gap: 5 }}>
+        {/* Official HiFadithi wordmark (982x182). */}
         <Image
-          source={require("../../assets/kit/brand/logo-drum.png")}
-          style={{ width: 22, height: 22 }}
+          source={require("../../assets/brand/hifadithi-logo.png")}
+          style={{ height: 24, width: Math.round((24 * 982) / 182) }}
           contentFit="contain"
+          accessibilityLabel="HiFadithi"
         />
-      </View>
-      <View style={{ gap: 1 }}>
-        <Text
-          style={{
-            color: colors.text,
-            fontFamily: fonts.bold,
-            fontSize: 16,
-            lineHeight: lh(20),
-            letterSpacing: -0.2,
-          }}
-        >
-          HiFadithi
-        </Text>
         <Text
           style={{
             color: light ? "rgba(245,239,234,0.72)" : colors.muted,
             fontFamily: fonts.medium,
-            fontSize: 10,
-            lineHeight: lh(13),
-            letterSpacing: 0.6,
+            fontSize: 9.5,
+            lineHeight: lh(12),
+            letterSpacing: 1.6,
           }}
         >
-          National Museums of Kenya
+          NATIONAL MUSEUMS OF KENYA
         </Text>
       </View>
     </Pressable>
@@ -215,16 +204,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   brand: { flexDirection: "row", alignItems: "center", gap: 10 },
-  brandBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(245,239,234,0.06)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(245,239,234,0.16)",
-  },
   topLink: {
     paddingHorizontal: 16,
     paddingVertical: 9,
