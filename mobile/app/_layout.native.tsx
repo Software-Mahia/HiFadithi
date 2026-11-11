@@ -49,6 +49,9 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   const modal = { presentation: "modal", animation: "slide_from_bottom", gestureEnabled: true } as const;
+  // 3D screens keep the original navigation (fade, normal card, no full-screen
+  // swipe-back) so every drag goes to the model, exactly as in the shipped app.
+  const model3d = { animation: "fade", presentation: "card", fullScreenGestureEnabled: false, gestureEnabled: true } as const;
   const fullScreen = { presentation: "fullScreenModal", animation: "slide_from_bottom", gestureEnabled: false } as const;
 
   return (
@@ -77,8 +80,8 @@ export default function RootLayout() {
                   <Stack.Screen name="scan" options={fullScreen} />
                   <Stack.Screen name="artefact-new" options={modal} />
                   <Stack.Screen name="artefact-record/[id]" />
-                  <Stack.Screen name="artefact/[id]" />
-                  <Stack.Screen name="viewer/[id]" options={{ presentation: "fullScreenModal", animation: "fade" }} />
+                  <Stack.Screen name="artefact/[id]" options={model3d} />
+                  <Stack.Screen name="viewer/[id]" options={model3d} />
                   <Stack.Screen name="capture/[id]" options={fullScreen} />
                   <Stack.Screen name="processing/[id]" />
                   <Stack.Screen name="ready/[id]" />
