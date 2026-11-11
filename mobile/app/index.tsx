@@ -2,7 +2,6 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import { Pressable } from "react-native";
 
-import { useAuth } from "../src/auth";
 import { colors, fonts, lh } from "../src/theme";
 import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
@@ -11,11 +10,8 @@ import { VStack } from "@/components/ui/vstack";
 /** Museum welcome screen. Navigation is intentional: the visitor chooses when
  * to leave the welcome experience instead of being redirected after a timer. */
 export default function Index() {
-  const { user, loading } = useAuth();
-
   const enterMuseum = () => {
-    if (loading) return;
-    router.replace(user ? "/artefacts" : "/(tabs)/gallery");
+    router.replace("/explore");
   };
 
   return (
@@ -77,17 +73,11 @@ export default function Index() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Explore the museum collection"
-            accessibilityState={{ disabled: loading }}
-            disabled={loading}
             onPress={enterMuseum}
             style={({ pressed }) => ({
               alignItems: "center",
               alignSelf: "flex-start",
-              backgroundColor: loading
-                ? colors.mutedDeep
-                : pressed
-                  ? colors.brickDark
-                  : colors.primary,
+              backgroundColor: pressed ? colors.brickDark : colors.primary,
               borderColor: colors.amber,
               borderRadius: 999,
               borderWidth: 1,

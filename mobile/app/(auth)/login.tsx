@@ -123,7 +123,7 @@ export default function LoginScreen() {
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => router.replace("/(tabs)/gallery")}
+        onPress={() => router.replace("/explore")}
         className="mt-[8px] items-center py-2"
       >
         <Text className="text-[13px] font-medium text-muted-foreground">Continue as guest</Text>

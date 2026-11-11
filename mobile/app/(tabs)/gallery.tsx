@@ -1,10 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { listPublicArtefacts } from "../../src/api";
 import type { Artefact } from "../../src/api";
+import { useAuth } from "../../src/auth";
 import {
   BrandHeader,
   Chips,
@@ -119,13 +120,19 @@ function GalleryCard({ artefact }: { artefact: Artefact }) {
 }
 
 export default function GalleryScreen() {
+  const { user, loading: authLoading } = useAuth();
   const [artefacts, setArtefacts] = useState<Artefact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [category, setCategory] = useState<Category>("");
   const [error, setError] = useState("");
 
+  useEffect(() => {
+    if (!authLoading && !user) router.replace("/explore");
+  }, [authLoading, user]);
+
   const load = useCallback(async () => {
+    if (authLoading || !user) return;
     setError("");
     try {
       setArtefacts(await listPublicArtefacts());
@@ -134,7 +141,7 @@ export default function GalleryScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -150,7 +157,9 @@ export default function GalleryScreen() {
 
   const visible = useMemo(() => artefacts.filter((item) => matches(item, category)), [artefacts, category]);
 
-  if (loading) return <Loading label="Loading published artefacts…" />;
+  if (authLoading || !user) return <Loading label="Checking researcher access…" />;
+
+  if (loading) return <Loading label="Loading your artefacts…" />;
 
   if (artefacts.length === 0) {
     return (
