@@ -54,18 +54,9 @@ export default function PublicArtefactScreen() {
     try {
       const data = await getPublicArtefact(id);
       setArtefact(data);
-      // Warm the model so the full-screen 3D view opens without a fresh
-      // download: the stream endpoint is cache-stable, so this fills the
-      // WebView/browser HTTP cache the viewer shares.
-      if (data.model3d && data.status === "published") {
-        fetch(publicModelUrl(data.id)).catch(() => {});
-      }
-      // Warm the model so the full-screen 3D view opens without a fresh
-      // download: the stream endpoint is cache-stable, so this fills the
-      // WebView/browser HTTP cache the viewer shares.
-      if (data.model3d && data.status === "published") {
-        fetch(publicModelUrl(data.id)).catch(() => {});
-      }
+      // No separate pre-fetch: the 3D viewer on this page loads the model itself
+      // and that fills the cache the full-screen viewer reuses. A pre-fetch here
+      // used a different cache on Android and downloaded the model again.
     } catch (err) {
       setError(err instanceof Error ? err.message : "This artefact is not available.");
     } finally {
