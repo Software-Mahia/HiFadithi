@@ -23,7 +23,9 @@ let authToken: string | null = null;
 
 /** Stable, cacheable model stream. Signed bucket URLs change per request and
  * bust the WebView/browser cache; this endpoint keeps its identity across
- * loads so repeat views come from cache. */
+ * loads so repeat views come from cache. Guests can stream only preview
+ * artefacts; the WebView sends no bearer token, so staff screens use the
+ * signed `model3d.glb_url` instead. */
 export function publicModelUrl(id: string) {
   return `${API_URL}/api/public/artefacts/${id}/model/`;
 }
@@ -224,13 +226,23 @@ export function me(token?: string | null) {
   return request<User>("/api/accounts/me/", { token });
 }
 
-export function listPublicArtefacts(query = "") {
-  const suffix = query ? `?q=${encodeURIComponent(query)}` : "";
-  return request<Artefact[]>(`/api/public/artefacts/${suffix}`, { token: null });
+/** Guest overview card: the server returns at most two, with no private fields. */
+export type ArtefactPreview = Pick<Artefact, "id" | "name" | "material" | "cover_image_url" | "has_model3d">;
+
+/** The capped public preview (at most two artefacts). The only list a guest can read. */
+export function listPreviewArtefacts() {
+  return request<ArtefactPreview[]>("/api/public/artefacts/preview/", { token: null });
 }
 
+/** Published gallery. Staff only: sends the signed-in token (401/403 for guests). */
+export function listPublicArtefacts(query = "") {
+  const suffix = query ? `?q=${encodeURIComponent(query)}` : "";
+  return request<Artefact[]>(`/api/public/artefacts/${suffix}`);
+}
+
+/** One published artefact. Guests get preview artefacts only; staff any they may see. */
 export function getPublicArtefact(id: string) {
-  return request<Artefact>(`/api/public/artefacts/${id}/`, { token: null });
+  return request<Artefact>(`/api/public/artefacts/${id}/`);
 }
 
 export function listArtefacts(query = "", status = "") {

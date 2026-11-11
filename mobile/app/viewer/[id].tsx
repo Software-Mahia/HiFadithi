@@ -38,14 +38,15 @@ function ViewerButton({
 
 export default function ViewerScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [artefact, setArtefact] = useState<Artefact | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [autoRotate, setAutoRotate] = useState(false);
 
   const load = useCallback(async () => {
-    if (!id) return;
+    // Wait for the saved session so a researcher is not loaded as a guest first.
+    if (!id || authLoading) return;
     try {
       setArtefact(user ? await getArtefact(id) : await getPublicArtefact(id));
     } catch (err) {
@@ -53,7 +54,7 @@ export default function ViewerScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, user]);
+  }, [id, authLoading, user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,7 +67,7 @@ export default function ViewerScreen() {
     else router.replace("/(tabs)/gallery");
   };
 
-  if (loading) return <Loading label="Preparing 3D model…" />;
+  if (authLoading || loading) return <Loading label="Preparing 3D model…" />;
 
   if (!artefact?.model3d) {
     return (
@@ -112,7 +113,7 @@ export default function ViewerScreen() {
       <Box className="overflow-hidden rounded-[18px]" style={{ flex: 1 }}>
         <ModelViewer
           glbUrl={
-            artefact.status === "published"
+            !user && artefact.status === "published"
               ? publicModelUrl(artefact.id)
               : artefact.model3d.glb_url
           }

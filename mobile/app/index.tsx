@@ -1,105 +1,152 @@
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import { Pressable } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Container, Eyebrow, PrimaryAction, TopBar, useLayout } from "../src/components/public";
 import { colors, fonts, lh } from "../src/theme";
-import { Box } from "@/components/ui/box";
 import { Text } from "@/components/ui/text";
-import { VStack } from "@/components/ui/vstack";
+
+const STEPS: [string, string][] = [
+  ["Capture", "Four guided photographs"],
+  ["Model", "AI-assisted 3D draft"],
+  ["Verify", "Checked against the object"],
+  ["Approve", "Released to the collection"],
+];
 
 /** Museum welcome screen. Navigation is intentional: the visitor chooses when
- * to leave the welcome experience instead of being redirected after a timer. */
+ * to leave the welcome experience instead of being redirected after a timer.
+ * The page is a single fixed screen (no scrolling): type and spacing scale with
+ * the window height so everything fits on short phones and laptop screens. */
 export default function Index() {
+  const { wide, medium, height } = useLayout();
+  const insets = useSafeAreaInsets();
+
   const enterMuseum = () => {
     router.replace("/explore");
   };
 
+  // Height bands: short (< 700, e.g. iPhone SE / small laptops), regular, tall.
+  const short = height < 700;
+  const tall = height >= 860;
+  const base = wide ? 64 : medium ? 50 : 36;
+  const titleSize = short ? Math.round(base * 0.78) : tall ? base : Math.round(base * 0.9);
+  const ledeSize = wide ? (short ? 16 : 18) : short ? 14 : 15;
+  const blockGap = short ? 14 : wide ? 26 : 20;
+  // Two-column step grid on phones takes height; on short phones show titles only.
+  const showStepDetail = medium || !short;
+
   return (
-    <Box className="flex-1" style={{ backgroundColor: colors.splash }}>
+    <View style={styles.root}>
       <Image
         source={require("../assets/nairobi-national-museum.jpg")}
         contentFit="cover"
-        transition={250}
-        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
+        transition={300}
+        style={StyleSheet.absoluteFill}
         accessibilityLabel="Nairobi National Museum entrance"
       />
 
       {/* Keep one uniform overlay across the full photo. A second partial-height
           overlay creates a visible horizontal opacity boundary on web. */}
-      <Box
-        className="absolute inset-0"
-        style={{ backgroundColor: "rgba(15, 11, 11, 0.52)" }}
-      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(15, 11, 11, 0.58)" }]} />
 
-      <VStack className="flex-1 justify-between px-7 pb-10 pt-14">
-        <VStack className="gap-3">
-          <Text
-            style={{
-              color: colors.amber,
-              fontFamily: fonts.semiBold,
-              fontSize: 11,
-              letterSpacing: 2.2,
-            }}
-          >
-            NAIROBI · MUSEUM HILL
-          </Text>
-          <Box className="h-px w-12" style={{ backgroundColor: colors.amber }} />
-        </VStack>
+      <View
+        style={{
+          flex: 1,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+          justifyContent: "space-between",
+          overflow: "hidden",
+        }}
+      >
+        <TopBar light />
 
-        <VStack className="max-w-[620px] gap-4">
-          <Text
-            style={{
-              color: colors.text,
-              fontFamily: fonts.bold,
-              fontSize: 42,
-              lineHeight: lh(48),
-              letterSpacing: -1.2,
-            }}
-          >
-            Welcome to the National Museums of Kenya
-          </Text>
-          <Text
-            style={{
-              color: "#F2E5D8",
-              fontFamily: fonts.regular,
-              fontSize: 15,
-              lineHeight: lh(23),
-              maxWidth: 520,
-            }}
-          >
-            Explore Kenya&apos;s history, culture and stories through interactive
-            artefacts made for museum researchers.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Explore the museum collection"
-            onPress={enterMuseum}
-            style={({ pressed }) => ({
-              alignItems: "center",
-              alignSelf: "flex-start",
-              backgroundColor: pressed ? colors.brickDark : colors.primary,
-              borderColor: colors.amber,
-              borderRadius: 999,
-              borderWidth: 1,
-              minWidth: 190,
-              paddingHorizontal: 24,
-              paddingVertical: 14,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            })}
-          >
+        <Container style={{ flexShrink: 1, justifyContent: "center" }}>
+          <View style={{ maxWidth: 760, gap: blockGap }}>
+            <View style={{ gap: short ? 10 : 14 }}>
+              <Eyebrow>Nairobi · Museum Hill</Eyebrow>
+              <View style={styles.rule} />
+            </View>
+
             <Text
+              accessibilityRole="header"
               style={{
-                color: colors.white,
-                fontFamily: fonts.semiBold,
-                fontSize: 13,
-                letterSpacing: 0.8,
+                color: colors.text,
+                fontFamily: fonts.bold,
+                fontSize: titleSize,
+                lineHeight: lh(Math.round(titleSize * 1.08)),
+                letterSpacing: wide ? -2 : -1.1,
               }}
             >
-              EXPLORE THE COLLECTION
+              Welcome to the National Museums of Kenya
             </Text>
-          </Pressable>
-        </VStack>
-      </VStack>
-    </Box>
+
+            <Text
+              style={{
+                color: "rgba(245,239,234,0.86)",
+                fontFamily: fonts.regular,
+                fontSize: ledeSize,
+                lineHeight: lh(Math.round(ledeSize * 1.62)),
+                maxWidth: 580,
+              }}
+            >
+              HiFadithi is the research workspace where NMK researchers and collection teams
+              document artefacts as verified, AI-assisted 3D records, together with the stories
+              that give them meaning.
+            </Text>
+
+            <View style={{ paddingTop: short ? 2 : 6 }}>
+              <PrimaryAction
+                label="Explore the collection"
+                accessibilityLabel="Explore the museum collection"
+                onPress={enterMuseum}
+              />
+            </View>
+          </View>
+        </Container>
+
+        <Container>
+          <View style={[styles.bottomRow, { paddingVertical: short ? 12 : 18 }]}>
+            {STEPS.map(([title, body], index) => (
+              <View key={title} style={[styles.bottomItem, medium ? { flexBasis: "22%" } : null]}>
+                <Text style={styles.bottomIndex}>{String(index + 1).padStart(2, "0")}</Text>
+                <View style={{ flexShrink: 1 }}>
+                  <Text style={styles.bottomTitle}>{title}</Text>
+                  {showStepDetail ? <Text style={styles.bottomBody}>{body}</Text> : null}
+                </View>
+              </View>
+            ))}
+          </View>
+        </Container>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.splash },
+  rule: { width: 48, height: 1, backgroundColor: colors.amber },
+  bottomRow: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "rgba(245,239,234,0.22)",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 12,
+    columnGap: 20,
+  },
+  bottomItem: { flexDirection: "row", gap: 12, flexBasis: "45%", flexGrow: 1 },
+  bottomIndex: {
+    color: colors.amber,
+    fontFamily: fonts.semiBold,
+    fontSize: 11,
+    lineHeight: lh(18),
+    letterSpacing: 1.2,
+  },
+  bottomTitle: { color: colors.text, fontFamily: fonts.semiBold, fontSize: 13, lineHeight: lh(18) },
+  bottomBody: {
+    color: "rgba(245,239,234,0.66)",
+    fontFamily: fonts.regular,
+    fontSize: 11.5,
+    lineHeight: lh(17),
+  },
+});
