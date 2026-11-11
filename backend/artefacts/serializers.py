@@ -223,6 +223,34 @@ class PublicArtefactSerializer(serializers.ModelSerializer):
         return NarrationSerializer(narration).data
 
 
+class PublicArtefactPreviewSerializer(serializers.ModelSerializer):
+    """Guest overview card: name, material, one photo, and whether a 3D model exists.
+
+    Narrower than PublicArtefactSerializer on purpose: no accession number,
+    description, narration or model links on the anonymous overview.
+    """
+
+    name = serializers.CharField(source="title", read_only=True)
+    cover_image_url = serializers.SerializerMethodField()
+    has_model3d = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Artefact
+        fields = ("id", "name", "material", "cover_image_url", "has_model3d")
+
+    def get_cover_image_url(self, obj):
+        image = obj.images.order_by("created_at").first()
+        if image is None:
+            return None
+        return storage.signed_download_url(CAPTURES_BUCKET, image.storage_path)
+
+    def get_has_model3d(self, obj):
+        try:
+            return obj.model3d is not None
+        except Exception:
+            return False
+
+
 class ArtefactImageSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
 
