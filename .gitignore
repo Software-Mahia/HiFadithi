@@ -12,3 +12,9 @@ backups/
 
 # local dev database
 *.sqlite3
+
+# design references and scratch asset extracts (optimised copies live in
+# mobile/assets/onboarding/)
+onboarding-screen.png.png
+mobile/Pasted image.png
+mobile/assets/kit/ui/????????-*-*-*-*
