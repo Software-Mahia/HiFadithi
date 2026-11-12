@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 
+import Constants from "expo-constants";
 import * as FileSystem from "expo-file-system/legacy";
 
 // On web the app is served same-origin with the API, so default to the current
@@ -7,10 +8,32 @@ import * as FileSystem from "expo-file-system/legacy";
 // baked-in URL. EXPO_PUBLIC_API_URL still overrides (e.g. a split web/API host).
 const webOrigin =
   Platform.OS === "web" && typeof window !== "undefined" ? window.location.origin : "";
+
+/** The host Metro is served from, e.g. "192.168.2.112:8081" on a phone, or
+ * "127.0.0.1:8081" in a simulator. When Metro runs over a LAN, that host is
+ * also the laptop running a local API, so following it keeps the app working
+ * when DHCP hands out a new address. Under `expo start --tunnel` it is a public
+ * tunnel domain instead, which serves only the bundle — never treat that as the
+ * API host, or every request fails with "failed to connect to …". */
+const metroHost = (Constants.expoConfig?.hostUri ?? Constants.expoGoConfig?.debuggerHost ?? "")
+  .split(":")[0];
+
+const isPrivateHost = (host: string) =>
+  /^(localhost$|127\.|10\.0\.2\.2$|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+
+const devApiHost = isPrivateHost(metroHost) ? `http://${metroHost}:8000` : "";
+
+// Precedence: on native, a LAN Metro host means the API is on the same machine,
+// so it wins over a possibly stale local .env. With a tunnel (or no Metro host)
+// EXPO_PUBLIC_API_URL decides — that is the hosted API. Release builds have no
+// Metro host at all and always use the baked EXPO_PUBLIC_API_URL.
+const configuredHost =
+  Platform.OS === "web" ? process.env.EXPO_PUBLIC_API_URL || "" : devApiHost || process.env.EXPO_PUBLIC_API_URL || "";
+
 const fallbackHost =
   webOrigin || (Platform.OS === "android" ? "http://10.0.2.2:8000" : "http://127.0.0.1:8000");
 
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL || fallbackHost).replace(/\/$/, "");
+export const API_URL = (configuredHost || fallbackHost).replace(/\/$/, "");
 
 /** On web, photo URIs are blob:/data: URLs that must become real Blobs before
  * they can be attached to requests. The `{uri…}` FormData form is native-only. */
