@@ -2,7 +2,7 @@
  * the web keeps ArtefactForm.tsx. The save / upload / narration / generate logic
  * is copied verbatim from ArtefactForm.tsx: keep the two in sync. Only the
  * web-only file-input branch of pickPhoto is omitted (it cannot run natively). */
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -11,7 +11,9 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { createArtefact, generate3D, getNarration, saveNarration, updateArtefact, uploadPhoto } from "../api";
 import type { Artefact, ArtefactImage, ArtifactDraft, PhotoFile } from "../api";
+import { useAuth } from "../auth";
 import { photoFromAsset } from "../photos";
+import { clearDraft, keepPhoto, loadDraft, saveDraft as saveFormDraft } from "../native/formDraft";
 import { NButton, NField, NScreen, NavHeader, Notice, SectionHeader, Segmented, Surface, Touchable, line, space, type } from "../native/kit";
 import { Sheet } from "../native/sheet";
 import { useToast } from "../native/toast";
@@ -37,6 +39,19 @@ const EMPTY = {
   donor: "",
   location: "",
 };
+
+type FormFields = typeof EMPTY;
+
+/** The record's saved values, so editing starts from them instead of blank fields. */
+function fromArtefact(artefact?: Artefact | null): Partial<FormFields> {
+  if (!artefact) return {};
+  const fields: Partial<FormFields> = {};
+  for (const key of Object.keys(EMPTY) as (keyof FormFields)[]) {
+    const value = artefact[key];
+    if (typeof value === "string") fields[key] = value;
+  }
+  return fields;
+}
 
 function PhotoTile({
   label,
@@ -84,7 +99,8 @@ export function ArtefactForm({
   artefact?: Artefact | null;
   initial?: Partial<ArtifactDraft>;
 }) {
-  const [form, setForm] = useState({ ...EMPTY, ...initial });
+  // Saved record values first, then anything the scan screen filled in.
+  const [form, setForm] = useState<FormFields>({ ...EMPTY, ...fromArtefact(artefact), ...initial });
   const [story, setStory] = useState(artefact?.narration?.story_text || "");
   const [language, setLanguage] = useState<"en" | "sw">(artefact?.narration?.language === "sw" ? "sw" : "en");
   const [photos, setPhotos] = useState<Record<string, ArtefactImage>>(() => {
@@ -104,6 +120,90 @@ export function ArtefactForm({
   // 3D start) fails and the researcher retries, we update that record instead
   // of creating it again, which the server refuses ("This field must be unique.").
   const createdId = useRef<string | null>(null);
+
+  // --- autosaved draft -------------------------------------------------------
+  const { user } = useAuth();
+  const draftKey = `${user?.id ?? "guest"}:${artefact?.id ?? "new"}`;
+  const draftLoaded = useRef(false);
+  const [restored, setRestored] = useState(false);
+  const snapshot = (photos: object = pending) =>
+    JSON.stringify({ form, story, language, heightMm, pending: photos });
+  // What counts as "nothing unsaved": the values the form opened with, or the last
+  // successful save. Matching it removes the draft instead of writing one.
+  const baseline = useRef<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    // The record as saved on the server (scan results are unsaved changes too).
+    baseline.current = JSON.stringify({
+      form: { ...EMPTY, ...fromArtefact(artefact) },
+      story: artefact?.narration?.story_text || "",
+      language: artefact?.narration?.language === "sw" ? "sw" : "en",
+      heightMm: artefact?.height_mm || "",
+      pending: {},
+    });
+    loadDraft(draftKey).then((draft) => {
+      if (cancelled) return;
+      if (draft) {
+        // Scan results (initial) still win: they are newer than the draft.
+        setForm({ ...EMPTY, ...fromArtefact(artefact), ...draft.form, ...initial });
+        setStory(draft.story);
+        setLanguage(draft.language);
+        setHeightMm(draft.heightMm);
+        if (isNew) setPending(draft.pending as Partial<Record<Slot, PhotoFile>>);
+        createdId.current = draft.createdId;
+        setRestored(true);
+      } else if (initial && Object.keys(initial).length) {
+        // Fresh scan results: keep them even if nothing else is typed.
+        saveFormDraft(draftKey, { form, story, language, heightMm, pending: {}, createdId: null });
+      }
+      draftLoaded.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Load once per record; later prop changes must not overwrite typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  useEffect(() => {
+    if (!draftLoaded.current) return;
+    const timer = setTimeout(() => {
+      if (snapshot() === baseline.current && !createdId.current) {
+        clearDraft(draftKey);
+        return;
+      }
+      saveFormDraft(draftKey, {
+        form,
+        story,
+        language,
+        heightMm,
+        pending: pending as Record<string, PhotoFile>,
+        createdId: createdId.current,
+      });
+    }, 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, story, language, heightMm, pending, draftKey]);
+
+  /** After a successful save: nothing is unsaved any more. */
+  const draftSaved = () => {
+    createdId.current = null;
+    baseline.current = snapshot({}); // persist() has just emptied the pending photos
+    setRestored(false);
+    clearDraft(draftKey);
+  };
+
+  const startFresh = () => {
+    clearDraft(draftKey);
+    createdId.current = null;
+    setForm({ ...EMPTY, ...fromArtefact(artefact) });
+    setStory(artefact?.narration?.story_text || "");
+    setLanguage(artefact?.narration?.language === "sw" ? "sw" : "en");
+    setHeightMm(artefact?.height_mm || "");
+    setPending({});
+    setRestored(false);
+  };
 
   const photoCount = useMemo(() => {
     const keys = new Set([...Object.keys(photos), ...Object.keys(pending)]);
@@ -166,7 +266,19 @@ export function ArtefactForm({
     const saved = existingId
       ? await updateArtefact(existingId, payload(height))
       : await createArtefact(payload(height));
-    createdId.current = saved.id;
+    if (!existingId) {
+      createdId.current = saved.id;
+      // Record the new id right away: if a later step fails and the app is closed,
+      // reopening the form must update this record, not create it again.
+      await saveFormDraft(draftKey, {
+        form,
+        story,
+        language,
+        heightMm,
+        pending: pending as Record<string, PhotoFile>,
+        createdId: saved.id,
+      });
+    }
 
     await Promise.all(
       SLOTS.map((slot) => {
@@ -189,6 +301,7 @@ export function ArtefactForm({
     setBusy("draft");
     try {
       const saved = await persist(heightMm.trim() || artefact?.height_mm || null);
+      draftSaved();
       if (isNew) {
         router.replace(`/artefact-record/${saved.id}`);
       } else {
@@ -211,6 +324,7 @@ export function ArtefactForm({
     try {
       const saved = await persist(height);
       if (photoCount < 4) {
+        draftSaved();
         router.replace({
           pathname: `/capture/${saved.id}`,
           params: { next: "processing", back: isNew ? "edit" : "edit" },
@@ -218,6 +332,7 @@ export function ArtefactForm({
         return;
       }
       await generate3D(saved.id);
+      draftSaved();
       router.replace(`/processing/${saved.id}`);
     } catch (err) {
       Alert.alert("Could not generate", err instanceof Error ? err.message : "Please try again.");
@@ -265,7 +380,8 @@ export function ArtefactForm({
 
   const acceptPhoto = async (slot: Slot, file: PhotoFile) => {
     if (isNew) {
-      setPending((current) => ({ ...current, [slot]: file }));
+      const kept = await keepPhoto(draftKey, slot, file); // survives cache clean-up
+      setPending((current) => ({ ...current, [slot]: kept }));
       return;
     }
 
@@ -316,6 +432,15 @@ export function ArtefactForm({
             </Touchable>
           }
         />
+
+        {restored ? (
+          <View style={{ gap: space.sm }}>
+            <Notice tone="success" icon="refresh-outline">
+              We kept the details you entered last time. Check them, then save.
+            </Notice>
+            <NButton label="Start fresh" variant="ghost" compact icon="trash-outline" onPress={startFresh} />
+          </View>
+        ) : null}
 
         {/* OCR entry */}
         <Touchable onPress={scan} accessibilityLabel="Scan accession card" style={styles.scan}>
