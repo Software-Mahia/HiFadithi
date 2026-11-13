@@ -67,6 +67,22 @@ function messageFrom(body: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
+/** Parse a JSON reply. A non-JSON body (e.g. Render's empty 502 or an HTML error
+ * page while the server restarts) becomes a readable ApiError instead of
+ * "JSON Parse error". */
+function parseBody(text: string, status: number, code: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    const message =
+      status === 502 || status === 503 || status === 504
+        ? "The server is starting up or restarting. Please try again in a minute."
+        : `The server sent an unexpected reply (HTTP ${status}). Please try again.`;
+    throw new ApiError(message, status, code);
+  }
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = options.token === undefined ? authToken : options.token;
@@ -88,7 +104,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (response.status === 204) return undefined as T;
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const data = parseBody(text, response.status, "request_failed");
   if (!response.ok) {
     throw new ApiError(messageFrom(data), response.status, "request_failed");
   }
@@ -306,7 +322,7 @@ async function nativeUploadMultipart<T>(
     },
   });
   const text = result.body || "";
-  const data = text ? (JSON.parse(text) as unknown) : null;
+  const data = parseBody(text, result.status, "upload_failed");
   if (result.status >= 400) {
     throw new ApiError(messageFrom(data), result.status, "upload_failed");
   }
