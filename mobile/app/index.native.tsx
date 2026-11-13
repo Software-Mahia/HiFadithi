@@ -1,7 +1,7 @@
-/** Native first-visit experience: welcome and overview in one continuous scroll.
+/** Native first-visit experience: three-slide onboarding.
  * The web version is app/index.tsx (separate welcome page → /explore). */
-import { StoryHome } from "../src/native/StoryHome";
+import { Onboarding } from "../src/native/onboarding";
 
 export default function Index() {
-  return <StoryHome />;
+  return <Onboarding />;
 }
