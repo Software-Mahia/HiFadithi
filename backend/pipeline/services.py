@@ -18,6 +18,7 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException
 
 from artefacts.models import VIEW_KEYS
+from core.heavy_work import HeavyWorkBusy
 from core.storage import CAPTURES_BUCKET, signed_download_url
 from workflow.models import ModelVersion
 from workflow.services import create_version, transition_model
@@ -206,6 +207,9 @@ def apply_task_status(job, task):
                 model_path(version.artefact_id, version.version),
                 allowed=lambda url: model_url_allowed(url, job.engine),  # every redirect too
             )
+        except HeavyWorkBusy:
+            logger.info("Job %s: narration is running, copying the model on the next check", job.pk)
+            return job  # still active: the next poll, webhook or job-page refresh retries
         except ModelCopyError as exc:
             mark_failed(job, str(exc))
             return job
@@ -233,6 +237,9 @@ def _finish_job_artefact_fast_flow(job, task):
             f"{artefact.id}/model.glb",
             allowed=lambda url: model_url_allowed(url, job.engine),
         )
+    except HeavyWorkBusy:
+        logger.info("Job %s: narration is running, copying the model on the next check", job.pk)
+        return job  # still active: the next poll, webhook or job-page refresh retries
     except ModelCopyError as exc:
         mark_failed(job, str(exc))
         if artefact:
