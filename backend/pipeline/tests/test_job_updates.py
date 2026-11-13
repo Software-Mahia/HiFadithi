@@ -96,6 +96,24 @@ def test_a_finished_task_copies_the_model_and_moves_the_version_to_verification(
     assert setup.exists(version.glb_path)
 
 
+def test_the_model_copy_waits_for_narration_and_retries_on_the_next_check(
+    job, monkeypatch, setup, settings, tmp_path
+):
+    from core.heavy_work import heavy_work
+
+    settings.HEAVY_WORK_LOCK_FILE = str(tmp_path / "heavy.lock")
+    monkeypatch.setattr(model_files, "COPY_WAIT_SECONDS", 0.3)
+    use_engine(monkeypatch, FakeEngine(seconds=0, glb_url=FAKE_GLB))
+
+    with heavy_work(wait_seconds=0):  # a narration is synthesising
+        job = refresh_job(job)
+    assert job.is_active  # not failed: left for the next poll / webhook
+    assert job.status != Job.Status.FAILED
+
+    job = refresh_job(job)  # narration done: the copy goes ahead
+    assert (job.status, job.progress) == (Job.Status.SUCCEEDED, 100)
+
+
 def test_a_running_task_records_progress_but_never_goes_backwards(job, monkeypatch):
     use_engine(monkeypatch, Scripted(TaskStatus(status="IN_PROGRESS", progress=60)))
     assert refresh_job(job).progress == 60

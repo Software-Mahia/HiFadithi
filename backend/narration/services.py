@@ -12,11 +12,19 @@ from pathlib import Path
 from django.conf import settings
 
 from core import storage
+from core.heavy_work import HeavyWorkBusy, heavy_work
 from core.storage import NARRATION_BUCKET
 
 from .models import Language, Narration, NarrationStatus
 
 logger = logging.getLogger(__name__)
+
+# How long a narration waits for a 3D model copy to finish. Synthesis runs inside the
+# request (Q_SYNC), so wait + synthesis must stay well under gunicorn's 120 s timeout.
+NARRATION_WAIT_SECONDS = 45
+BUSY_MESSAGE = (
+    "The server is busy finishing a 3D model. Save the story again in a minute."
+)
 
 VOICE_BY_LANGUAGE = {
     Language.ENGLISH: "PIPER_VOICE_EN",
@@ -172,7 +180,15 @@ def generate_narration(narration_id):
 
     voice_path = voice_for(narration.language)
     try:
-        audio = _synthesize_mp3(narration.story_text, voice_path)
+        # Never alongside a 3D model copy: together they can exceed the server's memory.
+        with heavy_work(wait_seconds=NARRATION_WAIT_SECONDS):
+            audio = _synthesize_mp3(narration.story_text, voice_path)
+    except HeavyWorkBusy:
+        logger.warning("Narration %s skipped: a 3D model is still being processed", narration_id)
+        narration.status = NarrationStatus.FAILED
+        narration.error = BUSY_MESSAGE
+        narration.save(update_fields=["status", "error", "updated_at"])
+        return narration
     except (RuntimeError, subprocess.SubprocessError, OSError) as exc:
         logger.exception("Narration failed for %s", narration_id)
         narration.status = NarrationStatus.FAILED

@@ -91,6 +91,31 @@ def test_generate_narration_reports_missing_piper(artefact, monkeypatch):
 
 
 @pytest.mark.django_db
+def test_narration_waits_out_a_3d_copy_and_never_runs_alongside_it(
+    artefact, settings, tmp_path, monkeypatch
+):
+    from core.heavy_work import heavy_work
+
+    settings.HEAVY_WORK_LOCK_FILE = str(tmp_path / "heavy.lock")
+    monkeypatch.setattr(services, "NARRATION_WAIT_SECONDS", 0.3)
+    synthesised = []
+    monkeypatch.setattr(services, "_synthesize_mp3", lambda text, voice: synthesised.append(text))
+    narration = Narration.objects.create(
+        artefact=artefact,
+        story_text="A story",
+        language="en",
+        status=NarrationStatus.GENERATING,
+    )
+
+    with heavy_work(wait_seconds=0):  # a 3D model copy is running
+        result = services.generate_narration(str(narration.id))
+
+    assert synthesised == []
+    assert result.status == NarrationStatus.FAILED
+    assert result.error == services.BUSY_MESSAGE
+
+
+@pytest.mark.django_db
 def test_empty_story_clears_status(artefact):
     narration = Narration.objects.create(
         artefact=artefact, story_text="Old", status=NarrationStatus.READY
