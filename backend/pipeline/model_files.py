@@ -16,6 +16,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 
+from core.heavy_work import heavy_work
 from core.storage import MODELS_BUCKET
 
 from .glb import GlbError, GlbInfo, read_glb_info
@@ -27,6 +28,8 @@ MAX_GLB_BYTES = 100 * 1024 * 1024  # a 30k-triangle textured model is usually 5-
 DOWNLOAD_TIMEOUT = httpx.Timeout(15.0, connect=5.0)  # Meshy wants a webhook reply within ~25 s
 MAX_REDIRECTS = 3
 REDIRECT_CODES = {301, 302, 303, 307, 308}
+# Short: the copy runs inside the Meshy webhook (reply wanted within ~25 s) and polls.
+COPY_WAIT_SECONDS = 10
 
 
 class ModelCopyError(Exception):
@@ -60,7 +63,17 @@ def copy_model(
     client: httpx.Client | None = None,
     storage=None,
 ):
-    """Download the GLB, check it is a readable model, save it at `path`. Returns StoredModel."""
+    """Download the GLB, check it is a readable model, save it at `path`. Returns StoredModel.
+
+    Raises core.heavy_work.HeavyWorkBusy if a narration is still synthesising after
+    COPY_WAIT_SECONDS; the job stays active and the next poll or webhook retries it.
+    """
+    # Never alongside Piper narration: together they can exceed the server's memory.
+    with heavy_work(wait_seconds=COPY_WAIT_SECONDS):
+        return _copy_model(glb_url, path, allowed=allowed, client=client, storage=storage)
+
+
+def _copy_model(glb_url, path, *, allowed, client, storage):
     data = _download(glb_url, client or httpx.Client(timeout=DOWNLOAD_TIMEOUT), allowed)
     try:
         info = read_glb_info(data)
