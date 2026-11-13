@@ -371,25 +371,14 @@ export function BrandHeader({
   compact?: boolean;
 }) {
   return (
-    <VStack className="items-center gap-1">
-      <HStack className="items-center justify-center gap-2">
-        <Image
-          source={require("../../assets/kit/brand/logo-drum.png")}
-          style={{ width: compact ? 24 : 28, height: compact ? 24 : 28 }}
-          contentFit="contain"
-        />
-        <Text
-          className="text-foreground"
-          style={{
-            fontFamily: fonts.bold,
-            fontSize: compact ? 22 : 25,
-            lineHeight: lh(compact ? 28 : 32),
-            letterSpacing: -0.4,
-          }}
-        >
-          HiFadithi
-        </Text>
-      </HStack>
+    <VStack className="items-center gap-1.5">
+      {/* Official HiFadithi wordmark (982x182). */}
+      <Image
+        source={require("../../assets/brand/hifadithi-logo.png")}
+        style={{ height: compact ? 22 : 26, width: Math.round(((compact ? 22 : 26) * 982) / 182) }}
+        contentFit="contain"
+        accessibilityLabel="HiFadithi"
+      />
       <Text className="text-[10px] leading-[14px] text-muted-foreground">{tagline}</Text>
     </VStack>
   );
