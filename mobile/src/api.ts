@@ -62,9 +62,23 @@ function messageFrom(body: unknown): string {
     const error = (body as { error?: { message?: unknown } }).error;
     const message = error?.message;
     if (typeof message === "string") return message;
-    if (message) return JSON.stringify(message);
+    if (message && typeof message === "object") return fieldErrors(message as Record<string, unknown>);
+    if (message) return String(message);
   }
   return "Something went wrong. Please try again.";
+}
+
+/** {"accession_number": ["This field must be unique."]} becomes
+ * "Accession number: This field must be unique." (one line per field). */
+function fieldErrors(errors: Record<string, unknown>): string {
+  return Object.entries(errors)
+    .map(([field, value]) => {
+      const text = Array.isArray(value) ? value.join(" ") : String(value);
+      if (field === "non_field_errors" || field === "detail") return text;
+      const label = field.replace(/_/g, " ");
+      return `${label.charAt(0).toUpperCase()}${label.slice(1)}: ${text}`;
+    })
+    .join("\n");
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {

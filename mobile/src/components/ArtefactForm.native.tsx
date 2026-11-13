@@ -2,7 +2,7 @@
  * the web keeps ArtefactForm.tsx. The save / upload / narration / generate logic
  * is copied verbatim from ArtefactForm.tsx: keep the two in sync. Only the
  * web-only file-input branch of pickPhoto is omitted (it cannot run natively). */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
@@ -100,6 +100,10 @@ export function ArtefactForm({
   const toast = useToast();
 
   const isNew = !artefact;
+  // Set once a new artefact has been created. If a later step (photos, story,
+  // 3D start) fails and the researcher retries, we update that record instead
+  // of creating it again, which the server refuses ("This field must be unique.").
+  const createdId = useRef<string | null>(null);
 
   const photoCount = useMemo(() => {
     const keys = new Set([...Object.keys(photos), ...Object.keys(pending)]);
@@ -158,7 +162,11 @@ export function ArtefactForm({
   };
 
   const persist = async (height: string | null) => {
-    const saved = isNew ? await createArtefact(payload(height)) : await updateArtefact(artefact!.id, payload(height));
+    const existingId = artefact?.id ?? createdId.current;
+    const saved = existingId
+      ? await updateArtefact(existingId, payload(height))
+      : await createArtefact(payload(height));
+    createdId.current = saved.id;
 
     await Promise.all(
       SLOTS.map((slot) => {
